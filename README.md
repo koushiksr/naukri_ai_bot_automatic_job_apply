@@ -1,24 +1,20 @@
-<a href="url"><img src="https://github.com/GoliathReaper/JobSailor/assets/77969919/f3003461-ea38-4f35-9692-7925b24034af" align="centre" width="800" ></a>
+# Naukri AI Auto Apply
 
+Automated job application bot for Naukri.com powered by Gemini AI — intelligently applies to jobs and answers screening questions automatically.
 
+## Overview
 
+**Naukri AI Auto Apply** is an intelligent job application automation tool that applies for jobs on Naukri.com and automatically answers employer screening questions using Google's Gemini AI API. 
 
+Built with Playwright and Python, it intelligently:
+- 🤖 **Automates** job applications at scale
+- 🧠 **Uses AI** (Gemini Flash) to answer employer questions contextually
+- 🎯 **Filters** jobs by experience level
+- 📄 **Manages** resume uploads
+- 📋 **Handles** all question types (radio, dropdowns, text inputs, textareas)
+- 📊 **Tracks** application history and company redirects
 
-# JobSailor
-
-This project is an automated script that applies for jobs on Naukri.com and answers questions asked during the application process using the Gemini AI API. The script is written in Python and utilizes the Selenium WebDriver to navigate and interact with web pages.
-
-## Introduction
-
-This script automates the process of applying to jobs listed on Naukri.com. It uses Selenium WebDriver to navigate the Naukri website, locate job listings, and submit job applications. Additionally, it interacts with the Gemini AI to answer questions that may be part of the job application process.
-
-
-## Video Showcase
-[![YouTube](http://i.ytimg.com/vi/emFERSfJDAU/hqdefault.jpg)](https://www.youtube.com/watch?v=emFERSfJDAU)
-
-
-
-
+Stop manually filling out job forms. Let AI do it for you.
 
 ## Features
 
@@ -26,90 +22,109 @@ This script automates the process of applying to jobs listed on Naukri.com. It u
 - Skips already applied or expired job listings
 - Answers questions during the application process using Gemini AI API
 - Logs the count of successfully applied and failed job applications
+- Handles multiple question types: radio buttons, dropdowns, text inputs, textareas
+- Automatically detects and skips company site redirects
+- Experience level matching and filtering
 
 ## Prerequisites
 
 Before you begin, ensure you have met the following requirements:
 
-- Python 3.x installed on your local machine
-- `selenium` library installed (`pip install selenium`)
+- Python 3.8+ installed on your local machine
+- `playwright` library installed (`pip install playwright`)
+- `google-generativeai` library for Gemini API
 - Firefox browser installed
-- Geckodriver executable compatible with your Firefox version
-- Gemini AI API credentials ([Gemini AI API](https://ai.google.dev/gemini-api/docs/api-key))
+- Gemini AI API key ([Get API Key](https://ai.google.dev/gemini-api/docs/api-key))
 
-## Setup Instructions
+## Installation
 
-1. **Install Python and Pip:**
+1. **Clone the repository:**
 
-   Clone the repository:
+```bash
+git clone https://github.com/koushiksr/naukri_ai_bot_automatic_job_apply.git
+cd naukri_ai_bot_automatic_job_apply
+```
 
-   ```bash
-   git clone  https://github.com/GoliathReaper/JobSailor.git
-  
-   
-   Download and install Python from the [official website](https://www.python.org/). Pip, the package installer for Python, is included in Python installations.
+2. **Create a virtual environment (optional but recommended):**
 
-3. **Install Selenium:**
+```bash
+python -m venv venv
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+```
 
-   Open your terminal or command prompt and run the following command:
-   
-   ```bash
-   pip install selenium
-   ```
+3. **Install dependencies:**
 
-4. **Download Geckodriver:**
+```bash
+pip install -r requirements.txt
+playwright install firefox
+```
 
-   Download the Geckodriver from the [Geckodriver releases page](https://github.com/mozilla/geckodriver/releases) and extract the executable to a directory of your choice.
+4. **Configure your credentials:**
 
-5. **Prepare Your Firefox Browser:**
+Copy `conf.example.py` to `conf.py` and update with your details:
 
-   Ensure you have Firefox installed. Note the path to your Firefox executable and your Firefox profile path.
+```python
+EMAIL = "your_naukri_email@example.com"
+PASSWORD = "your_naukri_password"
+API_KEY = "your_gemini_api_key"
+OLLAMA_URL = "http://localhost:11434/api/generate"  # Optional
+MODEL = "gemini-2.5-flash"
+MY_EXPERIENCE = 2.5  # Your years of experience
+```
 
-6. **Clone the Repository:**
+5. **Prepare your resume:**
 
-   Clone or download this repository to your local machine.
-
-7. **Configuration:**
-
-   Update the following variables in your script with the correct paths and settings:
-
-   ```python
-   driver_path = "path_to_geckodriver_executable"
-   binary = "path_to_firefox_executable"
-   profile_path = "path_to_firefox_profile"
-   ```
-
-8. **Create CSV File:**
-
-   Prepare a CSV file named `jobs.csv` containing job links. Each line in the CSV should be a relative link to a job on Naukri.com.
-
-   Example `jobs.csv` content:
-   ```csv
-   /job-listings-python-backend-developer-adfolks-kochi-1-to-3-years-050624502539
-   /job-listings-software-engineer-xyz-corp-bangalore-2-to-4-years-050624503123
-   ```
-
-9. **Run the Script:**
-
-   Execute the script:
-
-   ```bash
-   python apply_jobs.py
-   ```
-
-   The script will read job links from `jobs.csv`, navigate to each job listing, and apply if not already applied or expired. It will also answer questions using the Bard AI API.
+Place your resume as `Resume.pdf` in the project root directory.
 
 ## Usage
 
-- Ensure the CSV file (`jobs.csv`) is in the same directory as your script.
-- Run the script and monitor the output for the status of job applications.
-- The script logs the count of successfully applied and failed job applications.
+Run the automation script:
 
-## Notes
+```bash
+python apply_jobs.py
+```
 
-- Make sure to handle exceptions and errors gracefully.
-- You might need to update XPaths and selectors based on changes in the Naukri.com website.
-- Ensure the Bard AI API is set up correctly and accessible from your script.
+The script will:
+1. Log into your Naukri account
+2. Fetch recommended jobs
+3. Filter by experience level
+4. Apply to each job
+5. Answer screening questions using Gemini AI
+6. Track applications and company redirects
+
+## Project Structure
+
+```
+naukri_ai_bot_automatic_job_apply/
+├── apply_jobs.py          # Main automation script
+├── gemini_api.py          # Gemini AI integration
+├── conf.py                # Configuration (add to .gitignore)
+├── rag_store.py           # RAG/knowledge base storage
+├── storage.py             # Data persistence
+├── company_sites.json     # Tracked company redirects
+├── Resume.pdf             # Your resume (dummy provided)
+└── requirements.txt       # Python dependencies
+```
+
+## How It Works
+
+1. **Login** - Authenticates with your Naukri credentials
+2. **Fetch Jobs** - Retrieves recommended job listings
+3. **Filter** - Skips jobs requiring more experience than you have
+4. **Apply** - Clicks the Apply button and waits for the chatbot
+5. **Answer** - Uses Gemini AI to intelligently answer screening questions
+6. **Track** - Logs successful and failed applications
+
+## Important Notes
+
+- The script uses Playwright for browser automation (headless=False by default)
+- AI answers are contextual based on your profile and the question
+- Questions are cached in `qa_store.json` to reduce API calls
+- Company site redirects are tracked to avoid accidental external applications
+- Ensure your Naukri account settings allow automation
 
 ## Disclaimer
 
@@ -121,4 +136,8 @@ Contributions are welcome! Please open an issue or submit a pull request for any
 
 ## License
 
-This project is licensed under the MIT License
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+
+For issues, questions, or suggestions, please open an issue on GitHub.

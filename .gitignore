@@ -1,0 +1,11 @@
+conf.py
+__pycache__/
+*.pyc
+venv/
+.vscode/
+.env
+*.log
+geckodriver.exe
+history/
+qa_store.json
+create_dummy_resume.py

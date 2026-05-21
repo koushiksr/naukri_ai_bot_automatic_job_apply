@@ -1,0 +1,9 @@
+EMAIL = "abac@gmail.com" //aukei email
+PASSWORD = "" // nakri password
+API_KEY = ""
+OLLAMA_URL = "http://localhost:11434/api/generate"
+
+MODEL       = "gemini-2.5-flash"
+QA_FILE     = "qa_store.json"
+RESUME_FILE = "Resume.pdf"
+MY_EXPERIENCE = 2.5
