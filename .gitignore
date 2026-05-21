@@ -1,11 +1,35 @@
-conf.py
+# Virtual Environment
+venv/
 __pycache__/
 *.pyc
-venv/
+*.pyo
+
+# IDE
 .vscode/
-.env
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
 *.log
-geckodriver.exe
-history/
-qa_store.json
-create_dummy_resume.py
+
+# Output
+output/
+external_jobs.json
+
+# Data
+data/Resume.pdf
+data/qa_store.json
+
+# Config with secrets
+src/conf.py
+!src/conf.py.example
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+.naukri_profile/

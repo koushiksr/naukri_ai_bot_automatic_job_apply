@@ -1,143 +1,325 @@
-# Naukri AI Auto Apply
+# 🤖 Naukri Automated Job Application Bot
 
-Automated job application bot for Naukri.com powered by Gemini AI — intelligently applies to jobs and answers screening questions automatically.
+AI-powered automated job application bot for Naukri.com with intelligent question answering using Google Gemini API.
 
-## Overview
-
-**Naukri AI Auto Apply** is an intelligent job application automation tool that applies for jobs on Naukri.com and automatically answers employer screening questions using Google's Gemini AI API. 
-
-Built with Playwright and Python, it intelligently:
-- 🤖 **Automates** job applications at scale
-- 🧠 **Uses AI** (Gemini Flash) to answer employer questions contextually
-- 🎯 **Filters** jobs by experience level
-- 📄 **Manages** resume uploads
-- 📋 **Handles** all question types (radio, dropdowns, text inputs, textareas)
-- 📊 **Tracks** application history and company redirects
-
-Stop manually filling out job forms. Let AI do it for you.
-
-## Features
-
-- Automates job application on Naukri.com
-- Skips already applied or expired job listings
-- Answers questions during the application process using Gemini AI API
-- Logs the count of successfully applied and failed job applications
-- Handles multiple question types: radio buttons, dropdowns, text inputs, textareas
-- Automatically detects and skips company site redirects
-- Experience level matching and filtering
-
-## Prerequisites
-
-Before you begin, ensure you have met the following requirements:
-
-- Python 3.8+ installed on your local machine
-- `playwright` library installed (`pip install playwright`)
-- `google-generativeai` library for Gemini API
-- Firefox browser installed
-- Gemini AI API key ([Get API Key](https://ai.google.dev/gemini-api/docs/api-key))
-
-## Installation
-
-1. **Clone the repository:**
-
-```bash
-git clone https://github.com/koushiksr/naukri_ai_bot_automatic_job_apply.git
-cd naukri_ai_bot_automatic_job_apply
-```
-
-2. **Create a virtual environment (optional but recommended):**
-
-```bash
-python -m venv venv
-# On Windows:
-venv\Scripts\activate
-# On macOS/Linux:
-source venv/bin/activate
-```
-
-3. **Install dependencies:**
-
-```bash
-pip install -r requirements.txt
-playwright install firefox
-```
-
-4. **Configure your credentials:**
-
-Copy `conf.example.py` to `conf.py` and update with your details:
-
-```python
-EMAIL = "your_naukri_email@example.com"
-PASSWORD = "your_naukri_password"
-API_KEY = "your_gemini_api_key"
-OLLAMA_URL = "http://localhost:11434/api/generate"  # Optional
-MODEL = "gemini-2.5-flash"
-MY_EXPERIENCE = 2.5  # Your years of experience
-```
-
-5. **Prepare your resume:**
-
-Place your resume as `Resume.pdf` in the project root directory.
-
-## Usage
-
-Run the automation script:
-
-```bash
-python apply_jobs.py
-```
-
-The script will:
-1. Log into your Naukri account
-2. Fetch recommended jobs
-3. Filter by experience level
-4. Apply to each job
-5. Answer screening questions using Gemini AI
-6. Track applications and company redirects
-
-## Project Structure
+## 📂 Project Structure
 
 ```
 naukri_ai_bot_automatic_job_apply/
-├── apply_jobs.py          # Main automation script
-├── gemini_api.py          # Gemini AI integration
-├── conf.py                # Configuration (add to .gitignore)
-├── rag_store.py           # RAG/knowledge base storage
-├── storage.py             # Data persistence
-├── company_sites.json     # Tracked company redirects
-├── Resume.pdf             # Your resume (dummy provided)
-└── requirements.txt       # Python dependencies
+├── src/                         # Source code
+│   ├── bot.py                  # Main bot logic (START HERE)
+│   ├── conf.py                 # Configuration & credentials
+│   ├── gemini_api_v2.py       # Gemini API wrapper
+│   ├── question_analyzer.py   # Question type detection
+│   └── resume_analyzer.py     # Resume parsing
+├── data/                        # Data files
+│   ├── Resume.pdf             # Your resume
+│   ├── qa_store.json          # Cached Q&A pairs
+│   └── company_sites.json     # Tracked redirects
+├── output/                      # Bot output
+│   └── external_jobs.json     # Jobs redirected to company sites
+├── logs/                        # Application logs
+│   └── bot.log               # Detailed execution log
+├── main.py                      # Entry point
+├── setup.sh                     # Setup script
+└── README.md                    # This file
 ```
 
-## How It Works
+## 🚀 Quick Start
 
-1. **Login** - Authenticates with your Naukri credentials
-2. **Fetch Jobs** - Retrieves recommended job listings
-3. **Filter** - Skips jobs requiring more experience than you have
-4. **Apply** - Clicks the Apply button and waits for the chatbot
-5. **Answer** - Uses Gemini AI to intelligently answer screening questions
-6. **Track** - Logs successful and failed applications
+### Step 1: Setup
 
-## Important Notes
+```bash
+chmod +x setup.sh
+./setup.sh
+```
 
-- The script uses Playwright for browser automation (headless=False by default)
-- AI answers are contextual based on your profile and the question
-- Questions are cached in `qa_store.json` to reduce API calls
-- Company site redirects are tracked to avoid accidental external applications
-- Ensure your Naukri account settings allow automation
+This will:
+- Create virtual environment
+- Install dependencies
+- Create config template
+- Setup directories
 
-## Disclaimer
+### Step 2: Configure
 
-Use this script responsibly and ensure compliance with Naukri.com's terms of service. Automating job applications may violate their policies and could result in account suspension or other consequences.
+```bash
+# Copy config template
+cp src/conf.py.example src/conf.py
 
-## Contributing
+# Edit with your credentials
+nano src/conf.py
+```
 
-Contributions are welcome! Please open an issue or submit a pull request for any improvements or bug fixes.
+Required settings:
+```python
+EMAIL = "your_naukri_email@example.com"
+PASSWORD = "your_password"
+API_KEY = "your_gemini_api_key"
+MY_EXPERIENCE = 2.5  # Your years of experience
+```
 
-## License
+### Step 3: Add Resume
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Place your resume at `data/Resume.pdf` (PDF format)
 
-## Support
+### Step 4: Run Bot
 
-For issues, questions, or suggestions, please open an issue on GitHub.
+```bash
+source venv/bin/activate
+python3 src/bot.py
+```
+
+## ✨ Features
+
+### ✅ Core Functionality
+- **Auto Login** - Handles Naukri authentication
+- **Job Discovery** - Finds recommended jobs
+- **Smart Filtering** - Skips jobs above your experience level
+- **Question Detection** - Identifies all question types
+
+### ✅ Question Types Handled
+- Radio buttons / Checkboxes
+- Dropdowns / Select fields
+- Text inputs
+- Text areas
+- Contenteditable fields
+
+### ✅ Intelligent Answering
+- **AI-Powered** - Uses Gemini to generate contextual answers
+- **Experience Matching** - Smart selection for experience range questions
+- **Caching** - Stores answers for reuse (faster subsequent runs)
+- **Pattern Recognition** - Learns from previous applications
+
+### ✅ External Site Handling
+- **Auto Detection** - Detects redirects to company websites
+- **Smart Save** - Saves job details (role, company, URL, JD)
+- **Clean Exit** - Closes tab and continues to next job
+- **Organized Output** - Results in `output/external_jobs.json`
+
+### ✅ Logging & Transparency
+- **Detailed Logs** - Saves to `logs/bot.log`
+- **Console Output** - Real-time status with emoji indicators
+- **Error Tracking** - Captures all issues for debugging
+
+## 📊 Output Files
+
+### Jobs Applied
+Success logged to console with job count
+
+### External Jobs (output/external_jobs.json)
+```json
+[
+  {
+    "company": "Tech Company Inc",
+    "role": "Senior Software Engineer",
+    "experience": "3-5 Yrs",
+    "jd": "Job description excerpt...",
+    "url": "https://techcompany.com/apply/job123",
+    "timestamp": "2024-05-21T20:30:45.123456"
+  }
+]
+```
+
+### Q&A Cache (data/qa_store.json)
+Stores answered questions for faster future runs
+
+### Logs (logs/bot.log)
+```
+[20:30:45] 🔐  Logging in...
+[20:30:49] ✅  Logged in
+[20:30:49] 🌐  Loading jobs...
+[20:30:55] 📌  Found 52 jobs
+[20:30:55] 🔎  Job 1/52
+[20:30:55] 📍  TechCorp - Senior Engineer
+[20:31:00] 🖱️  Clicked Apply
+[20:31:03] 🔘  Radio: ['Yes', 'No', 'Maybe']
+[20:31:03] 🤖  AI: Yes, I am
+[20:31:03] 🖱️  Clicked radio[0] ✅
+```
+
+## ⚙️ Configuration (src/conf.py)
+
+```python
+# REQUIRED
+EMAIL              # Naukri login email
+PASSWORD           # Naukri login password
+API_KEY            # Google Gemini API key
+MY_EXPERIENCE      # Years of experience (float)
+
+# Optional
+HEADLESS           # Run without browser GUI (False = show browser)
+BROWSER_TIMEOUT    # Page load timeout in milliseconds
+WAIT_TIME          # Wait between actions in seconds
+
+# File Paths
+QA_FILE            # Path to Q&A cache
+RESUME_FILE        # Path to your resume
+EXTERNAL_JOBS_FILE # Path to save external jobs
+BOT_LOG_FILE       # Path to save logs
+```
+
+## 🔐 Security Notes
+
+⚠️ **Important**
+- Never commit `src/conf.py` with real credentials
+- Add to `.gitignore` (already done)
+- Use environment variables for sensitive data
+- Keep API keys private
+- Logs may contain partial credential info
+
+### Secure Setup (Optional)
+
+Use `.env` file instead:
+```bash
+echo "NAUKRI_EMAIL=your_email@example.com" > .env.local
+echo "NAUKRI_PASSWORD=your_password" >> .env.local
+echo "GEMINI_API_KEY=your_api_key" >> .env.local
+chmod 600 .env.local
+```
+
+Then modify `src/conf.py` to load from `.env.local`
+
+## 🎯 Console Indicators
+
+| Icon | Meaning |
+|------|---------|
+| 🔐 | Login activity |
+| ✅ | Success |
+| ❌ | Error |
+| 🌐 | Navigation |
+| 📌 | Job discovery |
+| 🔎 | Job processing |
+| ❓ | Question detected |
+| 🤖 | AI response |
+| 🖱️ | Click action |
+| 🏢 | External company site |
+| 💾 | Data saved |
+| 🎉 | Application submitted |
+| ⏭️ | Job skipped |
+
+## 🔧 Troubleshooting
+
+### Browser Not Opening
+```
+Set HEADLESS = False in src/conf.py
+Check: playwright install chromium
+```
+
+### Login Fails
+```
+Verify EMAIL and PASSWORD in src/conf.py
+Check if Naukri changed login page
+```
+
+### Questions Not Answered
+```
+Check logs/bot.log for errors
+Verify GEMINI_API_KEY is valid
+Test internet connection
+```
+
+### External Jobs Not Saving
+```
+Verify output/ directory exists
+Check disk space
+Review file permissions
+```
+
+### Slow Performance
+```
+Set HEADLESS = True for faster runs
+Reduce MY_EXPERIENCE to match more jobs
+Clear data/qa_store.json and rebuild cache
+```
+
+## 📦 Dependencies
+
+See `requirements.txt`:
+- `playwright` - Browser automation
+- `google-generativeai` - Gemini API
+- `python-dotenv` - Environment variables
+
+## 📋 Workflow
+
+```
+1. Login to Naukri
+   ↓
+2. Load recommended jobs page
+   ↓
+3. Filter jobs (skip if exp > YOUR_EXP)
+   ↓
+4. For each job:
+   ├─ Open job in new tab
+   ├─ Check if external company site
+   │  ├─ YES → Save details & skip
+   │  └─ NO → Continue
+   ├─ Click Apply button
+   ├─ For each question:
+   │  ├─ Detect question type
+   │  ├─ Generate AI response
+   │  └─ Fill & submit
+   ├─ Save application when complete
+   └─ Move to next job
+   ↓
+5. Print summary (applied count, external count)
+```
+
+## 🎓 How It Works
+
+### Question Detection
+- Analyzes DOM to identify input type
+- Extracts options/placeholder text
+- Caches for future reference
+
+### AI Answering
+- Sends question to Gemini API
+- Context includes your experience & skills
+- Generates contextual response
+- Matches response to available options
+
+### Experience Matching
+- Parses "X-Y years" format
+- Selects closest match to MY_EXPERIENCE
+- Special handling for "3-5 years" vs "5+ years"
+
+### External Detection
+- Monitors URL changes after "Apply" click
+- Identifies redirects to non-Naukri domains
+- Saves job details before closing tab
+
+## 💡 Tips
+
+1. **First Run** - Slower due to Q&A cache building
+2. **Subsequent Runs** - Faster with cached answers
+3. **Monitor Console** - Watch for 🤖 AI responses
+4. **Check Logs** - Review `logs/bot.log` for details
+5. **Test Questions** - Try with 1-2 jobs first
+6. **Adjust Experience** - Lower MY_EXPERIENCE to test more
+
+## 🐛 Debugging
+
+Enable detailed output:
+```bash
+python3 -u src/bot.py 2>&1 | tee debug.log
+```
+
+Check logs:
+```bash
+tail -f logs/bot.log
+```
+
+## 📞 Support
+
+1. Check `logs/bot.log` for error details
+2. Verify all config settings in `src/conf.py`
+3. Ensure resume at `data/Resume.pdf`
+4. Test with `MY_EXPERIENCE = 1` to match more jobs
+5. Review console emoji indicators
+
+## 📄 License
+
+Private Project
+
+## ✨ Version
+
+Bot v3.0 - Clean, organized, production-ready
