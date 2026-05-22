@@ -7,7 +7,7 @@ Main entry point - Run this to start the bot
 import sys
 sys.path.insert(0, './src')
 
-from bot import *
+import bot
 
 if __name__ == "__main__":
-    pass
+    bot.main()

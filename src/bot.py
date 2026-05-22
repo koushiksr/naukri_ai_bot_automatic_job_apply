@@ -1,18 +1,316 @@
 """
-Naukri Bot v3 - Using Strong Job Utilities API
+Naukri Bot v3 - Using Strong Job Utilities API & Gemini API in one file
 """
 
 import re
+import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 import json
 import os
 from datetime import datetime
-from playwright.sync_api import sync_playwright, Page, Locator
-from gemini_api_v2 import answer_question
-from job_utils import JobList, JobDetails
-from conf import EMAIL, PASSWORD, MY_EXPERIENCE, EXTERNAL_JOBS_FILE, BOT_LOG_FILE
+from typing import Dict, Optional, Tuple
+from difflib import SequenceMatcher
 
+from playwright.sync_api import sync_playwright, Page, Locator
+from google import genai
+import urllib.request
+import urllib.error
+
+from naukri_jobs_handler import JobList, Job
+from conf import (
+    EMAIL, PASSWORD, MY_EXPERIENCE, EXTERNAL_JOBS_FILE, BOT_LOG_FILE,
+    API_KEY, MODEL, OLLAMA_MODEL, QA_FILE, RESUME_FILE, JOB_FILTERS, PREDEFINED_ANSWERS
+)
+from question_analyzer import QuestionAnalyzer, QuestionType
+from resume_analyzer import ResumeAnalyzer, load_resume
+from csv_logger import CSVLogger
+
+# ═══════════════════════════════════════════════════════════════
+# GEMINI API INTEGRATION
+# ═══════════════════════════════════════════════════════════════
+
+class SkipJobException(Exception):
+    """Raised when the job should be skipped (e.g. unknown answer)"""
+    pass
+
+# Global state
+_client = None
+_resume_analyzer = None
+_qa_cache = {}
+_stats = {'calls': 0, 'cached': 0, 'generated': 0}
+
+
+class GeminiAnswerEngine:
+    """Enhanced answer generation with context awareness"""
+    
+    def __init__(self):
+        self.resume_text = load_resume(RESUME_FILE)
+        self.resume_analyzer = ResumeAnalyzer(self.resume_text)
+        self._init_client()
+        self._load_cache()
+    
+    def _init_client(self):
+        """Initialize Gemini client"""
+        global _client
+        if _client is None:
+            _client = genai.Client(api_key=API_KEY)
+    
+    def _load_cache(self):
+        """Load Q&A cache from file"""
+        global _qa_cache
+        if os.path.exists(QA_FILE):
+            try:
+                with open(QA_FILE, 'r') as f:
+                    _qa_cache = json.load(f)
+                    print(f"✅ Loaded {len(_qa_cache)} cached Q&A pairs")
+            except Exception as e:
+                print(f"⚠️  Error loading cache: {e}")
+    
+    def _save_cache(self):
+        """Save Q&A cache to file"""
+        try:
+            with open(QA_FILE, 'w') as f:
+                json.dump(_qa_cache, f, indent=2)
+        except Exception as e:
+            print(f"⚠️  Error saving cache: {e}")
+    
+    def _normalize_text(self, text: str) -> str:
+        """Normalize text for comparison"""
+        return re.sub(r'\s+', ' ', text.lower().strip())
+    
+    def _find_similar_cached_question(self, question: str, threshold: float = 0.85) -> Optional[str]:
+        """Find similar question in cache"""
+        normalized_q = self._normalize_text(question)
+        
+        for cached_q, cached_a in _qa_cache.items():
+            similarity = SequenceMatcher(None, normalized_q, self._normalize_text(cached_q)).ratio()
+            if similarity >= threshold:
+                return cached_a
+        
+        return None
+    
+    def _build_context_prompt(self, question: str, analyzer: QuestionAnalyzer) -> str:
+        """Build enhanced prompt with context"""
+        strategy = analyzer.strategy
+        context = self.resume_analyzer.get_context_for_question(question)
+        
+        # Merge skills from context with user's configured must-have skills
+        conf_skills = JOB_FILTERS.get("must_have_keywords", [])
+        all_skills = list(context['skills']) + conf_skills
+        all_skills = list(dict.fromkeys(all_skills)) # deduplicate
+        
+        prompt_parts = [
+            "You are an expert job application assistant helping a candidate answer interview questions.",
+            f"\nCANDIDATE PROFILE:\n{self.resume_analyzer.summary}",
+            f"\nCANDIDATE SKILLS: {', '.join(all_skills[:15])}",
+            f"\nCANDIDATE EXPERIENCE: EXACTLY {MY_EXPERIENCE} years.",
+            f"\nQUESTION: {question}",
+            f"\nQUESTION TYPE: {analyzer.question_type.value}",
+            f"\nANSWER STRATEGY: {analyzer.get_prompt_template()}",
+        ]
+        
+        # Add context-specific information
+        if strategy['focus'] == 'technical_and_soft':
+            prompt_parts.append(f"\nRELEVANT SKILLS: {', '.join(all_skills[:10])}")
+        
+        elif strategy['focus'] == 'professional_background':
+            prompt_parts.append(f"\nCOMPANIES: {', '.join(context['companies'][:3])}")
+        
+        elif strategy['focus'] == 'management_ability':
+            prompt_parts.append(f"\nLeadership skills inferred from: {', '.join(all_skills[:4])}")
+        
+        # Add tone instruction
+        prompt_parts.append(f"\nTONE: {strategy['tone'].capitalize()}, professional, and concise.")
+        
+        # Add strict formatting rules
+        prompt_parts.append("\nEXTREMELY IMPORTANT RULES:")
+        prompt_parts.append("- Keep ALL answers as minimalist and short as possible.")
+        prompt_parts.append(f"- If the question asks for years of experience (overall or in a specific skill), answer ONLY with the exact number '{MY_EXPERIENCE}'. Do not include the word 'years'.")
+        prompt_parts.append(f"- Assume the candidate has exactly {MY_EXPERIENCE} years of experience in ALL skills listed above.")
+        prompt_parts.append("- If you don't know the answer or the question asks for information not in the resume, output EXACTLY the phrase 'UNKNOWN_ANSWER'.")
+        
+        # Add length instruction
+        if strategy['length'] == 'short':
+            prompt_parts.append("- Length: 1 sentence maximum.")
+        elif strategy['length'] == 'medium':
+            prompt_parts.append("- Length: 1-2 sentences maximum.")
+        else:
+            prompt_parts.append("- Length: 2 sentences maximum.")
+        
+        # Add example instruction if applicable
+        if strategy['examples']:
+            prompt_parts.append("- Include a brief relevant example if possible.")
+            
+        if hasattr(self, '_current_history') and self._current_history:
+            prompt_parts.append("\nPREVIOUSLY ANSWERED QUESTIONS IN THIS SESSION (FOR CONTEXT):")
+            prompt_parts.append(self._current_history)
+        
+        prompt_parts.append("\nProvide ONLY the exact answer to the input field - no explanations, no greetings, and no extra text.")
+        
+        return "\n".join(prompt_parts)
+    
+    def _generate_answer(self, question: str, analyzer: QuestionAnalyzer, history: str = "") -> str:
+        """Generate answer using Gemini with context"""
+        self._current_history = history
+        try:
+            prompt = self._build_context_prompt(question, analyzer)
+            
+            print(f"🤖 Generating answer for: {question[:50]}...")
+            
+            models_to_try = [MODEL, "gemini-3.5-flash", "gemini-2.5-flash"]
+            # Deduplicate while preserving order
+            models_to_try = list(dict.fromkeys(models_to_try))
+            
+            last_error = None
+            answer = None
+            
+            for m in models_to_try:
+                try:
+                    response = _client.models.generate_content(
+                        model=m,
+                        contents=prompt
+                    )
+                    answer = response.text.strip()
+                    if m != MODEL:
+                        print(f"⚠️ Fell back to model: {m}")
+                    break
+                except Exception as e:
+                    last_error = e
+                    print(f"⚠️ Model {m} failed: {e}. Trying next...")
+            
+            if answer is None:
+                print(f"⚠️ All Gemini models failed. Trying local Ollama ({OLLAMA_MODEL})...")
+                try:
+                    url = "http://localhost:11434/api/generate"
+                    data = json.dumps({"model": OLLAMA_MODEL, "prompt": prompt, "stream": False}).encode("utf-8")
+                    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+                    with urllib.request.urlopen(req, timeout=30) as response:
+                        result = json.loads(response.read().decode("utf-8"))
+                        answer = result.get("response", "").strip()
+                        print(f"✅ Fell back to local Ollama model: {OLLAMA_MODEL}")
+                except Exception as ollama_err:
+                    print(f"❌ Ollama fallback also failed: {ollama_err}")
+                    raise last_error
+                
+            print(f"✅ Answer generated by LLM: {answer[:30]}...")
+            # Clean up the answer
+            answer = re.sub(r'^(answer:|response:|here\'s.*?:)', '', answer, flags=re.IGNORECASE).strip()
+            
+            if answer == "UNKNOWN_ANSWER":
+                raise SkipJobException("AI does not know the answer to this question.")
+            
+            return answer
+        
+        except SkipJobException:
+            raise
+        except Exception as e:
+            print(f"❌ Error generating answer: {e}")
+            raise SkipJobException(f"Failed to generate answer: {e}")
+    
+    def answer_question(self, question: str, job_context: str = "", history: str = "") -> Tuple[str, Dict]:
+        """
+        Main method to answer a question with caching and analysis
+        
+        Returns:
+            Tuple of (answer, metadata)
+        """
+        _stats['calls'] += 1
+        
+        # 1. Predefined answers override
+        q_lower = question.lower()
+        for kw, ans in PREDEFINED_ANSWERS.items():
+            # Match if ALL words in the key are present anywhere in the question
+            # e.g., "expected ctc" will match "What is your expected and current ctc?"
+            if all(k in q_lower for k in kw.split()):
+                _stats['cached'] += 1
+                
+                # Automatically convert to Lacs if the question asks for it
+                if str(ans).isdigit() and int(ans) >= 100000:
+                    if any(l in q_lower for l in ["lakh", "lac", "lpa"]):
+                        ans = str(int(ans) / 100000).rstrip('0').rstrip('.')
+                        
+                log("⚡", f"Rule override triggered for '{kw}'")
+                return str(ans), {'source': 'rule', 'analyzer': None}
+        
+        # Analyze question
+        analyzer = QuestionAnalyzer(question)
+        
+        # Check if should skip
+        if analyzer.should_skip():
+            raise SkipJobException("Question analyzer identified this as a skip.")
+        
+        # Check cache
+        cached_answer = self._find_similar_cached_question(question)
+        if cached_answer:
+            _stats['cached'] += 1
+            print(f"✅ Using cached answer")
+            return cached_answer, {'source': 'cache', 'analyzer': analyzer}
+        
+        # Generate new answer
+        answer = self._generate_answer(question, analyzer, history)
+        _stats['generated'] += 1
+        
+        # Cache the answer
+        _qa_cache[question] = answer
+        self._save_cache()
+        
+        return answer, {'source': 'generated', 'analyzer': analyzer}
+    
+    def get_stats(self) -> Dict:
+        """Get usage statistics"""
+        return {
+            'total_calls': _stats['calls'],
+            'cached_answers': _stats['cached'],
+            'generated_answers': _stats['generated'],
+            'cache_hit_rate': _stats['cached'] / max(_stats['calls'], 1),
+            'cache_size': len(_qa_cache),
+        }
+
+
+# Global engine instance
+_engine = None
+
+def get_engine() -> GeminiAnswerEngine:
+    """Get or create the answer engine"""
+    global _engine
+    if _engine is None:
+        _engine = GeminiAnswerEngine()
+    return _engine
+
+
+def answer_question(question: str, job_context: str = "", history: str = "") -> str:
+    """
+    Answer a job application question
+    
+    Args:
+        question: The question to answer
+        job_context: Optional job/company context
+        history: String of previously answered questions for context
+    
+    Returns:
+        The answer string
+    """
+    engine = get_engine()
+    answer, metadata = engine.answer_question(question, job_context, history)
+    return answer
+
+
+def get_stats() -> Dict:
+    """Get API usage statistics"""
+    engine = get_engine()
+    return engine.get_stats()
+
+
+# ═══════════════════════════════════════════════════════════════
+# BOT SETTINGS & LOGGING
+# ═══════════════════════════════════════════════════════════════
 MAX_ROUNDS = 20
-BUFFER_MS = 1000
+BUFFER_MS = 3000
 
 
 def log(icon: str, msg: str):
@@ -29,10 +327,14 @@ def log(icon: str, msg: str):
 
 def js_click(el: Locator) -> bool:
     try:
-        el.evaluate("el => el.click()")
+        el.click(force=True, timeout=2000)
         return True
     except:
-        return False
+        try:
+            el.evaluate("el => el.click()")
+            return True
+        except:
+            return False
 
 
 def wait(page: Page, ms: int = BUFFER_MS):
@@ -90,12 +392,30 @@ def login(page: Page):
 # ═══════════════════════════════════════════════════════════════
 
 def is_applied(page: Page) -> bool:
-    sels = [
-        "text=/successfully applied/i",
-        "text=/application submitted/i",
-        "text=/applied successfully/i",
-    ]
-    return any(page.locator(sel).count() > 0 for sel in sels)
+    """Check for success indicators"""
+    try:
+        content = page.content().lower()
+        success_phrases = [
+            "successfully applied", 
+            "application submitted", 
+            "applied successfully",
+            "already applied"
+        ]
+        if any(phrase in content for phrase in success_phrases):
+            return True
+            
+        # Check if the Apply button has changed to an 'Applied' state
+        try:
+            # Often Naukri changes the button text exactly to "Applied"
+            applied_elem = page.locator("button:text-is('Applied'), div:text-is('Applied'), span:text-is('Applied')").first
+            if applied_elem.count() > 0 and applied_elem.is_visible():
+                return True
+        except:
+            pass
+            
+        return False
+    except:
+        return False
 
 
 def find_apply_btn(page: Page) -> Locator | None:
@@ -103,7 +423,7 @@ def find_apply_btn(page: Page) -> Locator | None:
         return None
     try:
         btn = page.locator("button:has-text('Apply')").first
-        btn.wait_for(state="visible", timeout=2000)
+        btn.wait_for(state="visible", timeout=6000)
         return btn
     except:
         return None
@@ -181,10 +501,10 @@ def get_question(chatbot) -> str:
 def has_input(chatbot) -> bool:
     """Check if there's unanswered input"""
     try:
-        radios = chatbot.locator("div.ssrc__radio-btn-container, div[class*='radio-btn']")
+        radios = chatbot.locator("div.ssrc__radio-btn-container, div[class*='radio-btn'], label:has(input[type='radio'])")
         if radios.count() > 0:
             checked = chatbot.locator(
-                "div.ssrc__radio-btn-container input:checked, div[class*='radio-btn'] input:checked"
+                "div.ssrc__radio-btn-container input:checked, div[class*='radio-btn'] input:checked, label:has(input[type='radio']:checked), input[type='radio']:checked"
             )
             if checked.count() == 0:
                 return True
@@ -211,17 +531,33 @@ def has_input(chatbot) -> bool:
     return False
 
 
-def answer_turn(chatbot, q: str) -> bool:
+def click_save_or_next(chatbot):
+    for btn_text in ["Save", "Next", "Submit", "Proceed", "Continue"]:
+        try:
+            btn = chatbot.locator(f"button:has-text('{btn_text}'), div.sendMsg:has-text('{btn_text}'), [class*='btn']:has-text('{btn_text}')").last
+            if btn.count() > 0:
+                btn.wait_for(state="visible", timeout=1500)
+                js_click(btn)
+                log("🖱️", f"Clicked '{btn_text}' after answering")
+                wait(get_page(chatbot), 2000)
+                return True
+        except:
+            pass
+    return False
+
+
+def answer_turn(chatbot, q: str, history: str = "") -> Tuple[bool, str]:
     """Answer ONE input element with AI help"""
     page = get_page(chatbot)
     
     # ── RADIO ──
-    radios = chatbot.locator("div.ssrc__radio-btn-container, div[class*='radio-btn']")
+    radios = chatbot.locator("div.ssrc__radio-btn-container, div[class*='radio-btn'], label:has(input[type='radio'])")
     if radios.count() > 0:
         opts = [o.strip() for o in radios.all_text_contents() if o.strip()]
         if opts:
             log("🔘", f"Radio: {opts}")
             
+            ai_ans = ""
             if "experience" in q.lower():
                 idx = 0
                 for i, opt in enumerate(opts):
@@ -230,22 +566,29 @@ def answer_turn(chatbot, q: str) -> bool:
                         start, end = nums
                         if start <= MY_EXPERIENCE <= end:
                             idx = i
+                            ai_ans = opt
                             break
                     elif nums and MY_EXPERIENCE >= nums[0]:
                         idx = i
+                        ai_ans = opt
+                if not ai_ans: ai_ans = opts[idx]
             else:
                 try:
-                    ai_ans = answer_question(q)
+                    ai_ans = answer_question(q, history=history)
                     log("🤖", f"AI: {ai_ans[:50]}")
                     
                     idx = 0
                     for i, opt in enumerate(opts):
                         if ai_ans.lower() in opt.lower():
                             idx = i
+                            ai_ans = opt
                             break
+                except SkipJobException:
+                    raise
                 except Exception as e:
                     log("❌", f"AI error: {e}")
                     idx = 0
+                    ai_ans = opts[idx] if opts else ""
             
             container = radios.nth(idx)
             label = container.locator("label, input[type='radio'], input[type='checkbox']")
@@ -253,8 +596,9 @@ def answer_turn(chatbot, q: str) -> bool:
             ok = js_click(target)
             log("🖱️", f"Clicked radio[{idx}]" + (" ✅" if ok else " ❌"))
             if ok:
+                click_save_or_next(chatbot)
                 wait(page, BUFFER_MS)
-            return ok
+            return (ok, ai_ans)
 
     # ── DROPDOWN ──
     dropdown = chatbot.locator("select")
@@ -264,21 +608,27 @@ def answer_turn(chatbot, q: str) -> bool:
         if opts:
             log("📋", f"Dropdown: {opts}")
             
+            ai_ans = ""
             try:
-                ai_ans = answer_question(q)
+                ai_ans = answer_question(q, history=history)
                 idx = 0
                 for i, opt in enumerate(opts):
                     if ai_ans.lower() in opt.lower():
                         idx = i
+                        ai_ans = opt
                         break
+            except SkipJobException:
+                raise
             except:
                 idx = 0
+                ai_ans = opts[idx] if opts else ""
             
             try:
                 dropdown.first.select_option(label=opts[idx])
                 log("📋", f"Selected ✅")
+                click_save_or_next(chatbot)
                 wait(page, BUFFER_MS)
-                return True
+                return (True, ai_ans)
             except Exception as e:
                 log("❌", f"Dropdown error: {e}")
 
@@ -286,7 +636,9 @@ def answer_turn(chatbot, q: str) -> bool:
     box = chatbot.locator("div[contenteditable='true']")
     if box.count() > 0:
         try:
-            ans = answer_question(q)
+            ans = answer_question(q, history=history)
+        except SkipJobException:
+            raise
         except:
             ans = "Open to discuss"
         
@@ -296,58 +648,107 @@ def answer_turn(chatbot, q: str) -> bool:
         log("✏️", f"Typed ✅")
         wait(page, 400)
         box.first.press("Enter")
+        click_save_or_next(chatbot)
         wait(page, BUFFER_MS)
-        return True
+        return (True, ans)
 
     # ── TEXT INPUT ──
     inp = chatbot.locator("input[type='text'], input[type='number'], textarea")
     if inp.count() > 0:
         try:
-            ans = answer_question(q)
+            ans = answer_question(q, history=history)
+        except SkipJobException:
+            raise
         except:
             ans = "As per discussion"
-        
         inp.first.fill(ans)
         inp.first.press("Enter")
         log("✏️", f"Typed ✅")
+        click_save_or_next(chatbot)
         wait(page, BUFFER_MS)
-        return True
+        return (True, ans)
 
-    return False
+    return (False, "")
 
 
 # ═══════════════════════════════════════════════════════════════
 # APPLY PROCESS
 # ═══════════════════════════════════════════════════════════════
 
-def apply_job(job_page: Page):
-    """Apply to job with question handling"""
+def apply_job(job_page: Page) -> Tuple[bool | str, Any]:
+    """Apply to job with question handling."""
     
     btn = find_apply_btn(job_page)
     if not btn:
         log("❌", "No Apply button")
-        return False
+        return (False, None)
 
     btn.scroll_into_view_if_needed()
-    js_click(btn)
+    btn_text = btn.inner_text().strip().lower()
+    if "company site" in btn_text:
+        log("🌐", "Button says 'Apply on company site'")
+        
+    try:
+        # Detect if clicking opens a new tab (external site)
+        with job_page.context.expect_page(timeout=2000) as new_page_info:
+            js_click(btn)
+        new_page = new_page_info.value
+        ext_url = new_page.url
+        log("🌐", "External company site opened in new tab")
+        try:
+            new_page.close()
+        except:
+            pass
+        return ("External", ext_url)
+    except:
+        # No new tab opened. Standard Naukri apply or it just clicked it normally.
+        pass
+
     log("🖱️", "Clicked Apply")
     wait(job_page, 3000)
+
+    # Check if the current tab got redirected to an external site
+    if "naukri.com" not in job_page.url:
+        log("🌐", "Redirected to external company site")
+        return ("External", job_page.url)
+
+    # Immediately check if it applied successfully without any questions
+    if is_applied(job_page):
+        log("✅", "APPLIED!")
+        return (True, 0)
 
     chatbot = get_chatbot(job_page)
     prev_q = ""
     answered = 0
+    qa_history_list = []
+    stuck_counter = 0
+    idle_counter = 0
 
     for r in range(MAX_ROUNDS):
         has_inp = has_input(chatbot)
         q = get_question(chatbot)
 
         if has_inp:
+            idle_counter = 0  # reset idle if we have inputs
             q_use = q if q else prev_q
             log("❓", f"Q: {q_use[:60]}")
             
-            if answer_turn(chatbot, q_use):
+            history_str = "\n".join(qa_history_list[-5:])
+            ok, ans_text = answer_turn(chatbot, q_use, history=history_str)
+            if ok:
                 answered += 1
+                qa_history_list.append(f"Q: {q_use} A: {ans_text}")
                 log("✅", f"Answered ({answered})")
+                
+                if q_use == prev_q:
+                    stuck_counter += 1
+                else:
+                    stuck_counter = 0
+                
+                if stuck_counter >= 3:
+                    log("❌", "Stuck on the exact same question. Aborting loop.")
+                    return (False, answered)
+                
                 prev_q = q or prev_q
                 wait(get_page(chatbot), BUFFER_MS)
                 continue
@@ -368,13 +769,12 @@ def apply_job(job_page: Page):
 
             if is_applied(job_page):
                 log("✅", "APPLIED!")
-                wait(get_page(chatbot), 3000)
-                return True
+                return (True, answered)
 
             found_button = False
             for btn_text in ["Next", "Proceed", "Continue"]:
                 try:
-                    nxt = chatbot.locator(f"button:text-is('{btn_text}')").first
+                    nxt = chatbot.locator(f"button:has-text('{btn_text}'), div.sendMsg:has-text('{btn_text}'), [class*='btn']:has-text('{btn_text}')").first
                     nxt.wait_for(state="visible", timeout=500)
                     js_click(nxt)
                     log("🖱️", f"Clicked {btn_text}")
@@ -387,14 +787,22 @@ def apply_job(job_page: Page):
             if not found_button and answered >= 1:
                 for btn_text in ["Save", "Submit", "Done", "Finish"]:
                     try:
-                        save = chatbot.locator(f"button:text-is('{btn_text}')").first
+                        save = chatbot.locator(f"button:has-text('{btn_text}'), div.sendMsg:has-text('{btn_text}'), [class*='btn']:has-text('{btn_text}')").first
                         save.wait_for(state="visible", timeout=500)
                         js_click(save)
                         log("🖱️", f"Clicked {btn_text}")
                         wait(get_page(chatbot), 3000)
-                        return True
+                        if is_applied(job_page):
+                            log("✅", "APPLIED!")
+                            return (True, answered)
                     except:
                         pass
+                        
+            if not found_button:
+                idle_counter += 1
+                if idle_counter >= 3:
+                    log("⚠️", "Page is idle with no questions. Assuming completion.")
+                    return (True, answered)
 
             wait(get_page(chatbot), 2000)
             continue
@@ -407,139 +815,213 @@ def apply_job(job_page: Page):
     log("⚠️", "Max rounds reached")
     for btn_text in ["Save", "Submit", "Done", "Finish"]:
         try:
-            save = chatbot.locator(f"button:text-is('{btn_text}')").first
+            save = chatbot.locator(f"button:has-text('{btn_text}'), div.sendMsg:has-text('{btn_text}'), [class*='btn']:has-text('{btn_text}')").first
             save.wait_for(state="visible", timeout=500)
             js_click(save)
             log("🖱️", f"Final {btn_text}")
             wait(get_page(chatbot), 3000)
-            return True
+            if is_applied(job_page):
+                log("✅", "APPLIED!")
+                return (True, answered)
         except:
             pass
 
-    return False
+    return (False, answered)
 
 
 # ═══════════════════════════════════════════════════════════════
 # MAIN - USING JOB UTILITIES
 # ═══════════════════════════════════════════════════════════════
 
-try:
-    os.makedirs(os.path.dirname(BOT_LOG_FILE), exist_ok=True)
-    if os.path.exists(BOT_LOG_FILE):
-        os.remove(BOT_LOG_FILE)
-except:
-    pass
-
-with sync_playwright() as p:
-    browser = p.chromium.launch(headless=False)
-    context = browser.new_context()
-    page = context.new_page()
-
-    login(page)
-
-    log("🌐", "Loading jobs...")
-    page.goto("https://www.naukri.com/mnjuser/recommendedjobs")
-    wait(page, 6000)
-
-    # Initialize job utilities
-    job_list = JobList(page)
-    total_jobs = job_list.count()
-    log("📌", f"Found {total_jobs} jobs")
-
-    # Print all jobs summary
-    job_list.print_all_jobs(limit=10)
-    log("", "")
-
-    # Filter jobs using strong utilities
-    log("🔍", "Filtering jobs...")
-    
-    # Example: Get matching experience
-    matching_jobs = job_list.filter_by_experience(MY_EXPERIENCE)
-    log("📊", f"Jobs matching {MY_EXPERIENCE} years: {len(matching_jobs)}")
-    
-    # Example: Get Python jobs (must contain)
-    python_jobs = job_list.filter_by_keywords(["python", "django"])
-    log("📊", f"Python/Django jobs: {len(python_jobs)}")
-    
-    # Example: Exclude certain keywords
-    no_java = job_list.filter_by_keywords(["java"], must_contain=False)
-    log("📊", f"Jobs without Java: {len(no_java)}")
-    
-    # Combined filter
-    valid_jobs = job_list.filter_combined(
-        user_experience=MY_EXPERIENCE,
-        must_have_keywords=["python"],
-        must_not_have_keywords=["java"],
-        urgent_only=False
-    )
-    log("📊", f"Valid jobs (Python, no Java): {len(valid_jobs)}")
-    log("", "")
-
-    applied = 0
-    external = 0
-    skipped = 0
-
-    # Apply to first 5 jobs
-    for job_idx in valid_jobs[:5]:
-        log("\n" + "="*60, "")
-        log("🔎", f"Processing job index {job_idx}")
-        
-        # Get job details using utilities
-        job = job_list.get_at_index(job_idx)
-        
-        # Print job summary
-        job_list.print_job_summary(job_idx)
-        
-        job_page = None
-
+def main():
+        csv_logger = CSVLogger()
         try:
-            # Click with conditions
-            clicked = job_list.click_with_conditions(
-                job_idx,
-                must_contain=["python"],
-                must_not_contain=["java"]
-            )
+            os.makedirs(os.path.dirname(BOT_LOG_FILE), exist_ok=True)
+            if os.path.exists(BOT_LOG_FILE):
+                os.remove(BOT_LOG_FILE)
+        except:
+            pass
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=False)
+            context = browser.new_context()
+            page = context.new_page()
+
+            login(page)
+
+            log("🌐", "Loading jobs...")
+            page.goto("https://www.naukri.com/mnjuser/recommendedjobs")
+            wait(page, 6000)
+
+            # Initialize job utilities
+            job_list = JobList(page)
+            total_jobs = len(job_list)
+            log("📌", f"Found {total_jobs} jobs")
+
+            # Print all jobs summary
+            count = min(len(job_list), 1000)
+            print(f"\n📋 Total Jobs: {len(job_list)}")
+            print(f"🔍 Showing first {count} jobs:\n")
+            for i in range(count):
+                j = job_list[i]
+                print(f"{i+1}. {j.get_company():<30} | {j.get_role():<40} | {j.get_experience()}")
+            log("", "")
+
+            # Filter jobs using strong utilities
+            log("🔍", "Filtering jobs...")
+            must_have = JOB_FILTERS.get("must_have_keywords", [])
+            must_not_have = JOB_FILTERS.get("must_not_have_keywords", [])
+            women_only = JOB_FILTERS.get("women_only")
+            remote_only = JOB_FILTERS.get("remote_only")
+        
+            # Custom filter for user experience
+            def check_exp(job: Job) -> bool:
+                exp_str = job.get_experience()
+                if not exp_str: 
+                    return True
+                match = re.search(r'(\d+)\s*(?:-|to)\s*(\d+)', exp_str)
+                if match:
+                    min_e = int(match.group(1))
+                    return MY_EXPERIENCE >= min_e - 1
+                match = re.search(r'(\d+)\s*\+', exp_str)
+                if match:
+                    return MY_EXPERIENCE >= int(match.group(1))
+                match = re.search(r'(\d+)', exp_str)
+                if match:
+                    return MY_EXPERIENCE >= int(match.group(1)) - 1
+                return True
+
+            valid_jobs = []
+            for job in job_list:
+                try:
+                    role = job.get_role()
+                    role_lower = role.lower()
+                    
+                    if must_have:
+                        if not any(re.search(rf'\b{re.escape(k.lower())}\b', role_lower) for k in must_have):
+                            log("⏭️", f"Skipped [{job.index}] {role[:100]}... : Missing 'must_have' keywords in Role")
+                            csv_logger.log_skipped(job.get_company(), role, job.get_experience(), job.get_location(), "Missing must_have keywords")
+                            job.hide()
+                            continue
+                            
+                    if must_not_have:
+                        if any(re.search(rf'\b{re.escape(k.lower())}\b', role_lower) for k in must_not_have):
+                            log("⏭️", f"Skipped [{job.index}] {role[:100]}... : Contains 'must_not_have' keywords in Role")
+                            csv_logger.log_skipped(job.get_company(), role, job.get_experience(), job.get_location(), "Contains must_not_have keywords")
+                            job.hide()
+                            continue
+                            
+                    if women_only:
+                        if not job.is_women_only():
+                            log("⏭️", f"Skipped [{job.index}] {role[:100]}... : Not a women-only job")
+                            csv_logger.log_skipped(job.get_company(), role, job.get_experience(), job.get_location(), "Not a women-only job")
+                            job.hide()
+                            continue
+                    else:
+                        if job.is_women_only():
+                            log("⏭️", f"Skipped [{job.index}] {role[:100]}... : Women-only job (candidate is male)")
+                            csv_logger.log_skipped(job.get_company(), role, job.get_experience(), job.get_location(), "Women-only job (candidate is male)")
+                            job.hide()
+                            continue
+                        
+                    if remote_only and not job.is_remote():
+                        log("⏭️", f"Skipped [{job.index}] {role[:100]}... : Not a remote job")
+                        csv_logger.log_skipped(job.get_company(), role, job.get_experience(), job.get_location(), "Not a remote job")
+                        job.hide()
+                        continue
+                        
+                    if not check_exp(job):
+                        log("⏭️", f"Skipped [{job.index}] {role[:100]}... : Experience requirement mismatch")
+                        csv_logger.log_skipped(job.get_company(), role, job.get_experience(), job.get_location(), "Experience mismatch")
+                        job.hide()
+                        continue
+                        
+                    valid_jobs.append(job)
+                except Exception as e:
+                    log("⏭️", f"Skipped [{job.index}]: Error parsing card - {e}")
             
-            if not clicked:
-                log("⏭️", "Skipped (conditions not met)")
-                skipped += 1
-                continue
+            log("📊", f"Valid jobs (Config Match + Exp Match): {len(valid_jobs)}")
+            log("", "")
 
-            # Open in new tab
-            with context.expect_page() as new_tab:
-                job_list.jobs_loc.nth(job_idx).evaluate("el => el.click()")
+            applied = 0
+            external = 0
+            skipped = 0
+
+            # Apply to first 5 jobs
+            for job in valid_jobs[:5]:
+                log("\n" + "="*60, "")
+                log("🔎", f"Processing job index {job.index}")
             
-            job_page = new_tab.value
-            job_page.wait_for_load_state("domcontentloaded")
-            wait(job_page, 3000)
+                # Print job summary
+                print(f"{'='*60}")
+                print(f"📍 {job.get_company()} - {job.get_role()}")
+                print(f"📅 Experience: {job.get_experience()}")
+                print(f"📍 Location: {job.get_location()}")
+                print(f"💰 Salary: {job.get_salary()}")
+                print(f"🏷️  Skills: {', '.join(job.get_skills()[:5])}")
+                print(f"🔥 Urgent Hiring: {'Yes' if job.is_urgent_hiring() else 'No'}")
+                print(f"👩 Women Only: {'Yes' if job.is_women_only() else 'No'}")
+                print(f"{'='*60}")
+            
+                job_page = None
 
-            # Check for external redirect
-            if "naukri.com" not in job_page.url:
-                log("🏢", "External company site!")
+                try:
+                    # Open in new tab (strictly one by one)
+                    with context.expect_page() as new_tab:
+                        # Use evaluate to click using JS for reliability
+                        job._loc.locator("p.title").first.evaluate("el => el.click()")
                 
-                job_data = extract_job_details(job_page)
-                job_data["company"] = job.company
-                job_data["role"] = job.role
-                save_external_job(job_data)
-                external += 1
-                
-                job_page.close()
-                wait(page, 1000)
-                continue
+                    job_page = new_tab.value
+                    job_page.wait_for_load_state("domcontentloaded")
+                    wait(job_page, 3000)
 
-            # Apply
-            if apply_job(job_page):
-                applied += 1
-                log("🎉", f"APPLIED! ({applied})")
-            else:
-                log("❌", "Failed")
+                    # Check for external redirect
+                    if "naukri.com" not in job_page.url:
+                        log("🏢", "External company site!")
+                    
+                        job_data = extract_job_details(job_page)
+                        job_data["company"] = job.get_company()
+                        job_data["role"] = job.get_role()
+                        save_external_job(job_data)
+                        external += 1
+                        
+                        csv_logger.log_external(job.get_company(), job.get_role(), job.get_experience(), job.get_location(), job_page.url)
+                    
+                        job_page.close()
+                        wait(page, 1000)
+                        continue
 
-        except Exception as e:
-            log("💥", f"Error: {e}")
+                    # Apply
+                    res, data = apply_job(job_page)
+                    if res is True:
+                        applied += 1
+                        log("🎉", f"APPLIED! ({applied})")
+                        csv_logger.log_applied(job.get_company(), job.get_role(), job.get_experience(), job.get_location(), data)
+                    elif res == "External":
+                        external += 1
+                        log("🔗", "External application redirected")
+                        csv_logger.log_external(job.get_company(), job.get_role(), job.get_experience(), job.get_location(), data)
+                    else:
+                        log("❌", "Failed")
+                        csv_logger.log_skipped(job.get_company(), job.get_role(), job.get_experience(), job.get_location(), f"Application Failed (Answered {data} questions)")
 
-        finally:
-            if job_page and not job_page.is_closed():
-                job_page.close()
+                except SkipJobException as e:
+                    log("⏭️", f"Skipped job: {e}")
+                    skipped += 1
+                except Exception as e:
+                    log("💥", f"Error: {e}")
 
-    log("\n" + "="*60, "")
-    log("🏁", f"DONE - Applied: {applied} | External: {external} | Skipped: {skipped}")
+                finally:
+                    # Ensure the tab is always closed before moving to the next job
+                    # This guarantees we only have one application tab open at a time
+                    if job_page and not job_page.is_closed():
+                        job_page.close()
+                        log("🚫", "Closed Job Tab")
+                    wait(page, 1000)
+
+            log("\n" + "="*60, "")
+            log("🏁", f"DONE - Applied: {applied} | External: {external} | Skipped: {skipped}")
+
+
+if __name__ == "__main__":
+    main()

@@ -78,7 +78,7 @@ job = jobs.get_at_index(0)  # Returns JobDetails object
 jobs.print_job_summary(0)
 
 # Print all jobs
-jobs.print_all_jobs(limit=10)
+jobs.print_all_jobs(limit=1000)
 
 # Scroll to job
 jobs.scroll_to_job(0)
@@ -227,7 +227,7 @@ else:
 
 ```python
 # Print first 10 jobs
-jobs.print_all_jobs(limit=10)
+jobs.print_all_jobs(limit=1000)
 
 # Get urgent hiring jobs only
 urgent = jobs.filter_urgent_hiring()
@@ -447,7 +447,7 @@ jobs.scroll_to_job(0)
 
 # Display
 jobs.print_job_summary(0)
-jobs.print_all_jobs(limit=10)
+jobs.print_all_jobs(limit=1000)
 ```
 
 ---

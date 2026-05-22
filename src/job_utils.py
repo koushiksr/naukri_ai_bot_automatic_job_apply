@@ -391,7 +391,7 @@ class JobList:
         print(f"🎓 Freshers: {'Yes' if job.is_freshers else 'No'}")
         print(f"{'='*60}")
     
-    def print_all_jobs(self, limit: int = 10) -> None:
+    def print_all_jobs(self, limit: int = 1000) -> None:
         """Print summary of all jobs"""
         count = min(self.count(), limit)
         print(f"\n📋 Total Jobs: {self.count()}")

@@ -1,9 +1,41 @@
-EMAIL = "abac@gmail.com" //aukei email
-PASSWORD = "" // nakri password
+EMAIL = "abac@gmail.com" 
+PASSWORD = "" 
 API_KEY = ""
-OLLAMA_URL = "http://localhost:11434/api/generate"
 
 MODEL       = "gemini-2.5-flash"
-QA_FILE     = "qa_store.json"
-RESUME_FILE = "Resume.pdf"
+OLLAMA_MODEL = "llama3" # Used as a final fallback if Gemini hits rate limits
+
+# Application Settings
 MY_EXPERIENCE = 2.5
+QA_FILE = "data/qa_store.json"
+RESUME_FILE = "data/Resume.pdf"
+
+# Job Filter Settings
+# Maintain your job search preferences here. This will be used by the bot to filter jobs.
+JOB_FILTERS = {
+    "must_have_keywords": ["python", "ai", "ml", "artificial", "machine learning", "mern"],
+    "must_not_have_keywords": ["java"],
+    "women_only": False,         # True: ONLY apply to women-only jobs. False: SKIP women-only jobs.
+    "remote_only": False         # True: Apply ONLY to jobs marked 'Remote'
+}
+
+# Automation Settings
+HEADLESS = False  # Set to True to run browser in headless mode
+BROWSER_TIMEOUT = 60000  # milliseconds (increased from 30000 for better stability)
+WAIT_TIME = 2  # seconds between actions
+
+# File locations
+EXTERNAL_JOBS_FILE = "output/external_jobs.json"
+BOT_LOG_FILE = "logs/bot.log"
+
+# Rule-Based Question Overrides (RAG/Keyword Matching)
+# If a question contains these keywords, the bot instantly replies with the exact value, bypassing the AI.
+PREDEFINED_ANSWERS = {
+    "expected ctc": "800000",
+    "expected salary": "800000",
+    "current ctc": "500000",
+    "current salary": "500000",
+    "notice period": "30",
+    "monthly inhand": "34000",
+    "expected monthly": "70000"
+}
