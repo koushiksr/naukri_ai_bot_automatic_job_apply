@@ -240,7 +240,7 @@
                 <span class="refresh-dot"></span>
                 <span>Live (refreshing every 5s)</span>
                 <div style="margin-top: 8px; font-size: 11px;">
-                    Last sync: <span id="lastSync">15:08:29</span>
+                    Last sync: <span id="lastSync">15:23:40</span>
                 </div>
             </div>
         </div>
@@ -271,7 +271,7 @@
             </div>
             <div class="stat-card">
                 <div class="stat-label">Today - Total Runs</div>
-                <div class="stat-value" id="todayRuns">11</div>
+                <div class="stat-value" id="todayRuns">12</div>
                 <div class="stat-change">Next run in ~15 min</div>
             </div>
         </div>
@@ -282,6 +282,7 @@
             <button class="tab" onclick="switchTab('month')">This Month</button>
             <button class="tab" onclick="switchTab('year')">This Year</button>
             <button class="tab" onclick="switchTab('alltime')">All Time</button>
+            <button class="tab" onclick="switchTab('history')">Run History</button>
         </div>
         
         <!-- TODAY TAB -->
@@ -295,7 +296,7 @@
                     </tr>
                     <tr>
                         <td>Total Runs</td>
-                        <td><strong>11</strong></td>
+                        <td><strong>12</strong></td>
                     </tr>
                     <tr>
                         <td>Jobs Loaded</td>
@@ -356,7 +357,7 @@
                     </tr>
                     <tr>
                         <td>Total Runs</td>
-                        <td><strong>11</strong></td>
+                        <td><strong>12</strong></td>
                     </tr>
                     <tr>
                         <td>Jobs Applied</td>
@@ -397,7 +398,7 @@
                     </tr>
                     <tr>
                         <td>Total Runs</td>
-                        <td><strong>40</strong></td>
+                        <td><strong>41</strong></td>
                     </tr>
                     <tr>
                         <td>Jobs Applied</td>
@@ -434,7 +435,7 @@
                     </tr>
                     <tr>
                         <td>Total Runs</td>
-                        <td><strong>40</strong></td>
+                        <td><strong>41</strong></td>
                     </tr>
                     <tr>
                         <td>Jobs Applied</td>
@@ -471,12 +472,41 @@
                 </table>
             </div>
         </div>
+
+        <!-- RUN HISTORY TAB -->
+        <div id="history-content" class="tab-content">
+            <div class="chart-container">
+                <div class="chart-title">Last 100 Runs</div>
+                <table class="details-table" style="font-size: 13px;">
+                    <tr>
+                        <th>Time</th>
+                        <th>Status</th>
+                        <th>Applied</th>
+                        <th>Skipped</th>
+                        <th>Errors</th>
+                        <th>Duration</th>
+                    </tr>
+                    
+                        <tr style="background-color: #fee2e2;">
+                            <td><strong>2026-06-23 15:23:35</strong></td>
+                            <td>
+                                <span style="color: #ef4444; font-weight: bold;">Network Offline</span>
+                            </td>
+                            <td><span style="color: #10b981; font-weight: bold;">0</span> / 0</td>
+                            <td>0</td>
+                            <td>1</td>
+                            <td>0.1s</td>
+                        </tr>
+                        
+                </table>
+            </div>
+        </div>
         
         <!-- EXTERNAL URLS -->
         <div class="urls-container" style="margin-top: 30px;">
             <h3 style="margin-bottom: 15px;">🔗 External Company Redirects (Today)</h3>
             <div>
-                
+                {chr(10).join([f'<div class="url-item">{url}</div>' for url in daily_stats.get('external_urls', [])])}
             </div>
         </div>
         
@@ -487,7 +517,7 @@
     </div>
     
     <script>
-        function switchTab(tab) {
+        function switchTab(tab) {{
             // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
@@ -495,18 +525,18 @@
             // Show selected tab
             document.getElementById(tab + '-content').classList.add('active');
             event.target.classList.add('active');
-        }
+        }}
         
         // Auto-refresh every 5 seconds
-        setInterval(function() {
+        setInterval(function() {{
             location.reload();
-        }, 5000);
+        }}, 5000);
         
         // Update last sync time
-        setInterval(function() {
+        setInterval(function() {{
             const now = new Date();
             document.getElementById('lastSync').textContent = now.toLocaleTimeString();
-        }, 1000);
+        }}, 1000);
     </script>
 </body>
 </html>

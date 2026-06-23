@@ -12,10 +12,10 @@ from playwright.sync_api import sync_playwright
 from conf import SEARCH_URL, BOT_LOG_FILE, JOB_FILTERS, MY_EXPERIENCE
 from core.common import log, SkipJobException
 from core.browser import login, wait, save_external_job, MAX_ROUNDS, update_resume_if_needed
-from core.apply import apply_job, is_applied, extract_job_details, answer_turn, has_input, get_question, get_chatbot
+from core.apply import apply_job, extract_job_details
 from core.jobs_handler import JobList, Job
 from playwright_stealth import stealth_sync
-from ai.engine import get_stats, answer_question
+from ai.engine import get_stats
 from analytics.csv_logger import CSVLogger
 from analytics.bot_statistics import BotStatistics
 from analytics.dynamic_dashboard import DynamicDashboard

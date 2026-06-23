@@ -53,7 +53,7 @@
       "run_count": 22
     },
     "2026-06-23": {
-      "total_runs": 11,
+      "total_runs": 12,
       "jobs_loaded": 112,
       "jobs_filtered": 49,
       "jobs_applied": 13,
@@ -64,15 +64,17 @@
       "questions_by_type": {},
       "external_redirects": 2,
       "external_urls": [],
-      "errors": 0,
-      "error_list": [],
+      "errors": 1,
+      "error_list": [
+        "Network Offline"
+      ],
       "llm_calls": 2,
       "decision_tree_calls": 9,
       "cache_hits": 9,
       "success_rate": 11.607142857142858,
-      "average_duration": 0.0,
-      "total_duration": 0.0,
-      "run_count": 11
+      "average_duration": 0.008333333333333333,
+      "total_duration": 0.1,
+      "run_count": 12
     }
   },
   "weekly": {
@@ -106,7 +108,7 @@
       "run_count": 29
     },
     "2026-W25": {
-      "total_runs": 11,
+      "total_runs": 12,
       "jobs_loaded": 112,
       "jobs_filtered": 49,
       "jobs_applied": 13,
@@ -117,15 +119,17 @@
       "questions_by_type": {},
       "external_redirects": 2,
       "external_urls": [],
-      "errors": 0,
-      "error_list": [],
+      "errors": 1,
+      "error_list": [
+        "Network Offline"
+      ],
       "llm_calls": 2,
       "decision_tree_calls": 9,
       "cache_hits": 9,
       "success_rate": 11.607142857142858,
-      "average_duration": 0.0,
-      "total_duration": 0.0,
-      "run_count": 11
+      "average_duration": 0.008333333333333333,
+      "total_duration": 0.1,
+      "run_count": 12
     }
   },
   "monthly": {
@@ -159,7 +163,7 @@
       "run_count": 29
     },
     "2026-06": {
-      "total_runs": 11,
+      "total_runs": 12,
       "jobs_loaded": 112,
       "jobs_filtered": 49,
       "jobs_applied": 13,
@@ -170,20 +174,22 @@
       "questions_by_type": {},
       "external_redirects": 2,
       "external_urls": [],
-      "errors": 0,
-      "error_list": [],
+      "errors": 1,
+      "error_list": [
+        "Network Offline"
+      ],
       "llm_calls": 2,
       "decision_tree_calls": 9,
       "cache_hits": 9,
       "success_rate": 11.607142857142858,
-      "average_duration": 0.0,
-      "total_duration": 0.0,
-      "run_count": 11
+      "average_duration": 0.008333333333333333,
+      "total_duration": 0.1,
+      "run_count": 12
     }
   },
   "yearly": {
     "2026": {
-      "total_runs": 40,
+      "total_runs": 41,
       "jobs_loaded": 1179,
       "jobs_filtered": 813,
       "jobs_applied": 120,
@@ -201,19 +207,21 @@
         "https://company1.com/apply",
         "https://company2.com/apply"
       ],
-      "errors": 0,
-      "error_list": [],
+      "errors": 1,
+      "error_list": [
+        "Network Offline"
+      ],
       "llm_calls": 122,
       "decision_tree_calls": 289,
       "cache_hits": 184,
       "success_rate": 10.178117048346055,
-      "average_duration": 45.80449380278587,
-      "total_duration": 1832.179752111435,
-      "run_count": 40
+      "average_duration": 44.68975005149841,
+      "total_duration": 1832.2797521114348,
+      "run_count": 41
     }
   },
   "all_time": {
-    "total_runs": 40,
+    "total_runs": 41,
     "jobs_loaded": 1179,
     "jobs_filtered": 813,
     "jobs_applied": 120,
@@ -231,14 +239,37 @@
       "https://company1.com/apply",
       "https://company2.com/apply"
     ],
-    "errors": 0,
-    "error_list": [],
+    "errors": 1,
+    "error_list": [
+      "Network Offline"
+    ],
     "llm_calls": 122,
     "decision_tree_calls": 289,
     "cache_hits": 184,
     "success_rate": 10.178117048346055,
-    "average_duration": 45.80449380278587,
-    "total_duration": 1832.179752111435,
-    "run_count": 40
-  }
+    "average_duration": 44.68975005149841,
+    "total_duration": 1832.2797521114348,
+    "run_count": 41
+  },
+  "run_history": [
+    {
+      "jobs_loaded": 0,
+      "jobs_filtered": 0,
+      "jobs_applied": 0,
+      "jobs_skipped": 0,
+      "questions_total": 0,
+      "questions_answered": 0,
+      "questions_unanswered": 0,
+      "external_redirects": 0,
+      "llm_calls": 0,
+      "decision_tree_calls": 0,
+      "cache_hits": 0,
+      "errors": 1,
+      "error_list": [
+        "Network Offline"
+      ],
+      "duration": 0.1,
+      "timestamp": "2026-06-23 15:23:35"
+    }
+  ]
 }

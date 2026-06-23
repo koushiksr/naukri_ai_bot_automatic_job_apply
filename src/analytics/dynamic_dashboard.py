@@ -328,6 +328,7 @@ class DynamicDashboard:
             <button class="tab" onclick="switchTab('month')">This Month</button>
             <button class="tab" onclick="switchTab('year')">This Year</button>
             <button class="tab" onclick="switchTab('alltime')">All Time</button>
+            <button class="tab" onclick="switchTab('history')">Run History</button>
         </div>
         
         <!-- TODAY TAB -->
@@ -514,6 +515,39 @@ class DynamicDashboard:
                         <td>Success Rate</td>
                         <td><strong style="color: #8b5cf6;">{round(all_time.get('success_rate', 0), 1)}%</strong></td>
                     </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- RUN HISTORY TAB -->
+        <div id="history-content" class="tab-content">
+            <div class="chart-container">
+                <div class="chart-title">Last 100 Runs</div>
+                <table class="details-table" style="font-size: 13px;">
+                    <tr>
+                        <th>Time</th>
+                        <th>Status</th>
+                        <th>Applied</th>
+                        <th>Skipped</th>
+                        <th>Errors</th>
+                        <th>Duration</th>
+                    </tr>
+                    """ + "".join([
+                        f'''
+                        <tr style="{'background-color: #fee2e2;' if 'Network Offline' in r.get('error_list', []) else ''}">
+                            <td><strong>{r.get('timestamp', 'N/A')}</strong></td>
+                            <td>
+                                {'<span style="color: #ef4444; font-weight: bold;">Network Offline</span>' if 'Network Offline' in r.get('error_list', []) 
+                                else '<span style="color: #ef4444; font-weight: bold;">Failed</span>' if r.get('errors', 0) > 0 
+                                else '<span style="color: #10b981; font-weight: bold;">Success</span>'}
+                            </td>
+                            <td><span style="color: #10b981; font-weight: bold;">{r.get('jobs_applied', 0)}</span> / {r.get('jobs_loaded', 0)}</td>
+                            <td>{r.get('jobs_skipped', 0)}</td>
+                            <td>{r.get('errors', 0)}</td>
+                            <td>{round(r.get('duration', 0), 1)}s</td>
+                        </tr>
+                        ''' for r in stats.get('run_history', [])
+                    ]) + """
                 </table>
             </div>
         </div>

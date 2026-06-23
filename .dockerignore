@@ -1,8 +1,0 @@
-venv/
-.git/
-.github/
-.pytest_cache/
-__pycache__/
-logs/
-.naukri_profile/
-*.md
