@@ -14,7 +14,7 @@ from core.common import log, SkipJobException
 from core.browser import login, wait, save_external_job, MAX_ROUNDS, update_resume_if_needed
 from core.apply import apply_job, extract_job_details
 from core.jobs_handler import JobList, Job
-from playwright_stealth import stealth_sync
+from playwright_stealth import Stealth
 from ai.engine import get_stats
 from analytics.csv_logger import CSVLogger
 from analytics.bot_statistics import BotStatistics
@@ -40,7 +40,7 @@ def main():
             
             # Apply stealth plugin to avoid Naukri bot detection in headless mode
             if is_headless:
-                stealth_sync(page)
+                Stealth().apply_stealth_sync(page)
 
             login(page)
             update_resume_if_needed(page)
