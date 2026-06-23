@@ -213,35 +213,22 @@ class QuestionAnalyzer:
         return strategies.get(self.question_type, strategies[QuestionType.OTHER])
     
     def get_prompt_template(self) -> str:
-        """Get AI prompt template based on question type"""
+        """Get ultra-short answer style - think like real job applicant"""
         templates = {
-            QuestionType.SKILLS_STRENGTHS: """Based on the candidate's resume and the question asked, provide a confident answer highlighting relevant technical and soft skills. Keep it concise (2-3 sentences). Include specific examples where relevant.""",
-            
-            QuestionType.EXPERIENCE: """Based on the candidate's professional background, answer the experience question. Highlight relevant work history and achievements. Keep it concise (2-3 sentences).""",
-            
-            QuestionType.LEADERSHIP: """Answer the leadership question by highlighting relevant management experience and achievements from the resume. Show ability to lead and mentor. Keep it concise (2-3 sentences).""",
-            
-            QuestionType.PROBLEM_SOLVING: """Answer the problem-solving question by describing analytical approach and a relevant achievement. Show critical thinking skills. Keep it concise (2-3 sentences).""",
-            
-            QuestionType.MOTIVATION: """Answer why interested in this position by highlighting career goals and role alignment. Be enthusiastic but professional. Keep it concise (2-3 sentences).""",
-            
-            QuestionType.TECHNICAL: """Provide a detailed technical answer demonstrating expertise. Reference specific technologies or approaches. Keep it clear and professional. Keep it concise (2-4 sentences).""",
-            
-            QuestionType.AVAILABILITY: """Provide a direct, professional answer about availability. Be specific if possible.""",
-            
-            QuestionType.RELOCATION: """Answer the relocation question professionally. Be straightforward about willingness and flexibility.""",
-            
-            QuestionType.SALARY: """Provide a professional response about salary expectations based on experience level. Be reasonable and flexible.""",
-            
-            QuestionType.LANGUAGE: """Directly answer the language proficiency question with specifics.""",
-            
-            QuestionType.COMPANY_CULTURE: """Answer the culture fit question showing understanding of company values and how you align with them.""",
-            
-            QuestionType.WORK_STYLE: """Describe your work style/approach in a balanced, professional way with relevant examples.""",
-            
-            QuestionType.EDUCATION: """Answer the education question by highlighting relevant qualifications and learning achievements from the resume.""",
-            
-            QuestionType.OTHER: """Provide a professional, relevant answer to this question. Keep it concise and focused.""",
+            QuestionType.SKILLS_STRENGTHS: "List top 3 skills ONLY. Format: 'Python, ML, Problem Solving'",
+            QuestionType.EXPERIENCE: "ONLY the number. Format: '2.5' or '3-5'",
+            QuestionType.LEADERSHIP: "List 2-3 words max. NO sentences.",
+            QuestionType.PROBLEM_SOLVING: "Problem and solution in 5 words max. NO 'I'.",
+            QuestionType.MOTIVATION: "3-5 words max. Reasons as comma list.",
+            QuestionType.TECHNICAL: "Tech name only or 2-3 words. NO details.",
+            QuestionType.AVAILABILITY: "ONLY 'Immediate', 'Within 1 month', or date.",
+            QuestionType.RELOCATION: "ONLY 'Yes' or 'No'.",
+            QuestionType.SALARY: "ONLY number. Format: '500000' or '8'",
+            QuestionType.LANGUAGE: "Language and level. Format: 'English - Fluent'",
+            QuestionType.COMPANY_CULTURE: "2-3 matching qualities, comma-separated.",
+            QuestionType.WORK_STYLE: "2-3 words. NO sentences.",
+            QuestionType.EDUCATION: "Degree and field. Format: 'B.Tech CS'",
+            QuestionType.OTHER: "3-7 words max. NO explanations.",
         }
         return templates.get(self.question_type, templates[QuestionType.OTHER])
     

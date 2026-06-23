@@ -1,41 +1,105 @@
-EMAIL = "abac@gmail.com" 
-PASSWORD = "" 
-API_KEY = ""
+# Naukri Credentials
+EMAIL = "koushiksr1999@gmail.com"
+PASSWORD = "qohcyt-hobsEx-1xirco"
 
-MODEL       = "gemini-2.5-flash"
-OLLAMA_MODEL = "llama3" # Used as a final fallback if Gemini hits rate limits
+# Gemini API Configuration
+API_KEY = "[REDACTED]"
+MODEL = "gemini-2.5-flash"
+
+# Ollama Configuration (Primary Backend)
+OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_MODEL = "qwen3-vl:4b"
+USE_OLLAMA_FIRST = True  # Try local Ollama before Gemini
 
 # Application Settings
-MY_EXPERIENCE = 2.5
+MY_EXPERIENCE = 2.5  # Your years of experience
 QA_FILE = "data/qa_store.json"
 RESUME_FILE = "data/Resume.pdf"
 
-# Job Filter Settings
-# Maintain your job search preferences here. This will be used by the bot to filter jobs.
-JOB_FILTERS = {
-    "must_have_keywords": ["python", "ai", "ml", "artificial", "machine learning", "mern"],
-    "must_not_have_keywords": ["java"],
-    "women_only": False,         # True: ONLY apply to women-only jobs. False: SKIP women-only jobs.
-    "remote_only": False         # True: Apply ONLY to jobs marked 'Remote'
-}
+# Salary Configuration (for smart matcher)
+CURRENT_CTC_ANNUAL = 500000  # Annual salary in rupees
+EXPECTED_CTC_ANNUAL = 800000  # Expected salary in rupees
 
 # Automation Settings
 HEADLESS = False  # Set to True to run browser in headless mode
-BROWSER_TIMEOUT = 60000  # milliseconds (increased from 30000 for better stability)
+BROWSER_TIMEOUT = 60000  # milliseconds
 WAIT_TIME = 2  # seconds between actions
 
 # File locations
 EXTERNAL_JOBS_FILE = "output/external_jobs.json"
 BOT_LOG_FILE = "logs/bot.log"
 
-# Rule-Based Question Overrides (RAG/Keyword Matching)
-# If a question contains these keywords, the bot instantly replies with the exact value, bypassing the AI.
+# Job Filters
+JOB_FILTERS = {
+    "location": ["Bangalore", "Remote"],
+    "experience": [2, 3],
+    "job_type": ["Full-time", "Internship"],
+    "keywords": ["Python", "Data Science", "Machine Learning"],
+    "must_have_keywords": [],  # Leave empty to accept all
+    "must_not_have_keywords": [],
+    "women_only": False,
+    "remote_only": False,
+}
+
+# Smart Predefined Answers (most common questions)
+# Smart matcher auto-converts salary formats (lakhs ↔ annual)
 PREDEFINED_ANSWERS = {
-    "expected ctc": "800000",
-    "expected salary": "800000",
-    "current ctc": "500000",
+    # ===== SALARY / CTC (auto-converts between formats) =====
+    "current ctc": "500000",          # Will auto-convert to lakhs/monthly if asked
+    "expected ctc": "800000",         # Will auto-convert to lakhs/monthly if asked
+    "current ctc lakhs": "5",
+    "expected ctc lakhs": "8",
     "current salary": "500000",
-    "notice period": "30",
-    "monthly inhand": "34000",
-    "expected monthly": "70000"
+    "expected salary": "800000",
+    "take home": "35000",             # Monthly
+    "net salary": "35000",
+    
+    # ===== EXPERIENCE (years) =====
+    "total experience": "2.5",
+    "python experience": "2.5",
+    "machine learning": "2.5",
+    "ml experience": "2.5",
+    "data science": "2.5",
+    "data analysis": "2.5",
+    "sql": "2.5",
+    "java": "1",
+    "javascript": "1.5",
+    
+    # ===== LOCATION / RELOCATION =====
+    "current location": "Bangalore",
+    "city": "Bangalore",
+    "willing relocate": "Yes",
+    "open to relocation": "Yes",
+    "relocation": "Yes",
+    "preferred location": "Bangalore, Remote",
+    
+    # ===== AVAILABILITY / NOTICE PERIOD =====
+    "notice period": "0",
+    "can start": "Immediate",
+    "availability": "Immediate",
+    "when can you": "Immediate",
+    
+    # ===== COMPANY HISTORY =====
+    "current company": "Capgemini",
+    "current job title": "AI ML Engineer",
+    "current designation": "AI ML Engineer",
+    "previous company": "QuGates Technologies",
+    "worked at": "QuGates Technologies",
+    
+    # ===== SKILLS =====
+    "programming language": "Python, JavaScript, SQL",
+    "technical skills": "Python, ML, Problem Solving",
+    "strengths": "Python, ML, Problem Solving",
+    "tools and tech": "Python, Docker, AWS",
+    
+    # ===== MOTIVATION =====
+    "why join": "Growing tech, challenging work, team culture",
+    "why company": "Growing tech, challenging work",
+    "career goal": "Senior ML Engineer, Tech Lead",
+    
+    # ===== YES/NO QUESTIONS =====
+    "willing to travel": "Yes",
+    "open to travel": "Yes",
+    "shift work": "Yes",
+    "work on weekends": "Sometimes",
 }

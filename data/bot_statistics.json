@@ -1,0 +1,178 @@
+{
+  "created_at": "2026-05-22T13:50:13.908876",
+  "daily": {
+    "2026-05-22": {
+      "total_runs": 7,
+      "jobs_loaded": 232,
+      "jobs_filtered": 151,
+      "jobs_applied": 28,
+      "jobs_skipped": 100,
+      "questions_total": 105,
+      "questions_answered": 97,
+      "questions_unanswered": 8,
+      "questions_by_type": {
+        "salary": 5,
+        "experience": 8,
+        "location": 10
+      },
+      "external_redirects": 17,
+      "external_urls": [
+        "https://company1.com/apply",
+        "https://company2.com/apply"
+      ],
+      "errors": 0,
+      "error_list": [],
+      "llm_calls": 32,
+      "decision_tree_calls": 73,
+      "cache_hits": 45,
+      "success_rate": 12.068965517241379,
+      "average_duration": 86.70743540355137,
+      "total_duration": 606.9520478248596,
+      "run_count": 7
+    },
+    "2026-05-23": {
+      "total_runs": 22,
+      "jobs_loaded": 835,
+      "jobs_filtered": 613,
+      "jobs_applied": 79,
+      "jobs_skipped": 277,
+      "questions_total": 299,
+      "questions_answered": 275,
+      "questions_unanswered": 22,
+      "questions_by_type": {},
+      "external_redirects": 42,
+      "external_urls": [],
+      "errors": 0,
+      "error_list": [],
+      "llm_calls": 88,
+      "decision_tree_calls": 207,
+      "cache_hits": 130,
+      "success_rate": 9.461077844311378,
+      "average_duration": 55.692168376662515,
+      "total_duration": 1225.2277042865753,
+      "run_count": 22
+    }
+  },
+  "weekly": {
+    "2026-W20": {
+      "total_runs": 29,
+      "jobs_loaded": 1067,
+      "jobs_filtered": 764,
+      "jobs_applied": 107,
+      "jobs_skipped": 377,
+      "questions_total": 404,
+      "questions_answered": 372,
+      "questions_unanswered": 30,
+      "questions_by_type": {
+        "salary": 5,
+        "experience": 8,
+        "location": 10
+      },
+      "external_redirects": 59,
+      "external_urls": [
+        "https://company1.com/apply",
+        "https://company2.com/apply"
+      ],
+      "errors": 0,
+      "error_list": [],
+      "llm_calls": 120,
+      "decision_tree_calls": 280,
+      "cache_hits": 175,
+      "success_rate": 10.028116213683223,
+      "average_duration": 63.17861214177362,
+      "total_duration": 1832.179752111435,
+      "run_count": 29
+    }
+  },
+  "monthly": {
+    "2026-05": {
+      "total_runs": 29,
+      "jobs_loaded": 1067,
+      "jobs_filtered": 764,
+      "jobs_applied": 107,
+      "jobs_skipped": 377,
+      "questions_total": 404,
+      "questions_answered": 372,
+      "questions_unanswered": 30,
+      "questions_by_type": {
+        "salary": 5,
+        "experience": 8,
+        "location": 10
+      },
+      "external_redirects": 59,
+      "external_urls": [
+        "https://company1.com/apply",
+        "https://company2.com/apply"
+      ],
+      "errors": 0,
+      "error_list": [],
+      "llm_calls": 120,
+      "decision_tree_calls": 280,
+      "cache_hits": 175,
+      "success_rate": 10.028116213683223,
+      "average_duration": 63.17861214177362,
+      "total_duration": 1832.179752111435,
+      "run_count": 29
+    }
+  },
+  "yearly": {
+    "2026": {
+      "total_runs": 29,
+      "jobs_loaded": 1067,
+      "jobs_filtered": 764,
+      "jobs_applied": 107,
+      "jobs_skipped": 377,
+      "questions_total": 404,
+      "questions_answered": 372,
+      "questions_unanswered": 30,
+      "questions_by_type": {
+        "salary": 5,
+        "experience": 8,
+        "location": 10
+      },
+      "external_redirects": 59,
+      "external_urls": [
+        "https://company1.com/apply",
+        "https://company2.com/apply"
+      ],
+      "errors": 0,
+      "error_list": [],
+      "llm_calls": 120,
+      "decision_tree_calls": 280,
+      "cache_hits": 175,
+      "success_rate": 10.028116213683223,
+      "average_duration": 63.17861214177362,
+      "total_duration": 1832.179752111435,
+      "run_count": 29
+    }
+  },
+  "all_time": {
+    "total_runs": 29,
+    "jobs_loaded": 1067,
+    "jobs_filtered": 764,
+    "jobs_applied": 107,
+    "jobs_skipped": 377,
+    "questions_total": 404,
+    "questions_answered": 372,
+    "questions_unanswered": 30,
+    "questions_by_type": {
+      "salary": 5,
+      "experience": 8,
+      "location": 10
+    },
+    "external_redirects": 59,
+    "external_urls": [
+      "https://company1.com/apply",
+      "https://company2.com/apply"
+    ],
+    "errors": 0,
+    "error_list": [],
+    "llm_calls": 120,
+    "decision_tree_calls": 280,
+    "cache_hits": 175,
+    "success_rate": 10.028116213683223,
+    "average_duration": 63.17861214177362,
+    "total_duration": 1832.179752111435,
+    "run_count": 29
+  }
+}

@@ -1,5 +1,5 @@
 """
-Naukri Bot v3 - Using Strong Job Utilities API & Gemini API in one file
+Naukri Bot v3 - Using Strong Job Utilities API & Ollama (Primary) + Gemini (Fallback)
 """
 
 import re
@@ -24,14 +24,18 @@ import urllib.error
 from naukri_jobs_handler import JobList, Job
 from conf import (
     EMAIL, PASSWORD, MY_EXPERIENCE, EXTERNAL_JOBS_FILE, BOT_LOG_FILE,
-    API_KEY, MODEL, OLLAMA_MODEL, QA_FILE, RESUME_FILE, JOB_FILTERS, PREDEFINED_ANSWERS
+    API_KEY, MODEL, OLLAMA_MODEL, OLLAMA_URL, USE_OLLAMA_FIRST, QA_FILE, RESUME_FILE, JOB_FILTERS, PREDEFINED_ANSWERS
 )
 from question_analyzer import QuestionAnalyzer, QuestionType
 from resume_analyzer import ResumeAnalyzer, load_resume
 from csv_logger import CSVLogger
+from smart_answer_matcher import SmartAnswerMatcher
+from answer_decision_tree import AnswerDecisionTree
+from bot_statistics import BotStatistics
+from dynamic_dashboard import DynamicDashboard
 
 # ═══════════════════════════════════════════════════════════════
-# GEMINI API INTEGRATION
+# AI BACKEND INTEGRATION (Ollama Primary + Gemini Fallback)
 # ═══════════════════════════════════════════════════════════════
 
 class SkipJobException(Exception):
@@ -42,15 +46,17 @@ class SkipJobException(Exception):
 _client = None
 _resume_analyzer = None
 _qa_cache = {}
-_stats = {'calls': 0, 'cached': 0, 'generated': 0}
+_stats = {'calls': 0, 'cached': 0, 'generated': 0, 'ollama_used': 0, 'gemini_used': 0}
 
 
-class GeminiAnswerEngine:
-    """Enhanced answer generation with context awareness"""
+class AIAnswerEngine:
+    """Enhanced answer generation with Ollama (primary) + Gemini (fallback)"""
     
     def __init__(self):
         self.resume_text = load_resume(RESUME_FILE)
         self.resume_analyzer = ResumeAnalyzer(self.resume_text)
+        self.smart_matcher = SmartAnswerMatcher(current_ctc_annual=500000, expected_ctc_annual=800000)
+        self.decision_tree = AnswerDecisionTree()
         self._init_client()
         self._load_cache()
     
@@ -95,79 +101,105 @@ class GeminiAnswerEngine:
         return None
     
     def _build_context_prompt(self, question: str, analyzer: QuestionAnalyzer) -> str:
-        """Build enhanced prompt with context"""
-        strategy = analyzer.strategy
+        """Ultra-minimal prompt - answer like real job applicant in 5 seconds"""
         context = self.resume_analyzer.get_context_for_question(question)
-        
-        # Merge skills from context with user's configured must-have skills
         conf_skills = JOB_FILTERS.get("must_have_keywords", [])
         all_skills = list(context['skills']) + conf_skills
-        all_skills = list(dict.fromkeys(all_skills)) # deduplicate
+        all_skills = list(dict.fromkeys(all_skills))[:8]
         
-        prompt_parts = [
-            "You are an expert job application assistant helping a candidate answer interview questions.",
-            f"\nCANDIDATE PROFILE:\n{self.resume_analyzer.summary}",
-            f"\nCANDIDATE SKILLS: {', '.join(all_skills[:15])}",
-            f"\nCANDIDATE EXPERIENCE: EXACTLY {MY_EXPERIENCE} years.",
-            f"\nQUESTION: {question}",
-            f"\nQUESTION TYPE: {analyzer.question_type.value}",
-            f"\nANSWER STRATEGY: {analyzer.get_prompt_template()}",
+        # Minimal direct prompt
+        lines = [
+            "ANSWER THIS LIKE A REAL JOB APPLICANT FILLING A FORM IN 5 SECONDS.",
+            "",
+            f"CANDIDATE: {MY_EXPERIENCE} years experience. Skills: {', '.join(all_skills)}",
+            f"QUESTION: {question}",
+            "",
+            f"ANSWER STYLE: {analyzer.get_prompt_template()}",
+            "",
+            "DO NOT:",
+            "- Use sentences or periods",
+            "- Say 'I' or 'we' or 'the'",
+            "- Explain or add details",
+            "- Use adjectives or articles",
+            "",
+            "EXAMPLES:",
+            "Q: Python experience? -> A: 2.5",
+            "Q: Strengths? -> A: Python, ML, Analysis",
+            "Q: Why join? -> A: Growing tech, challenging work",
+            "Q: Willing relocate? -> A: Yes",
+            "Q: Salary? -> A: 500000",
+            "",
+            "ANSWER NOW (ONLY THE ANSWER, NOTHING ELSE):",
         ]
         
-        # Add context-specific information
-        if strategy['focus'] == 'technical_and_soft':
-            prompt_parts.append(f"\nRELEVANT SKILLS: {', '.join(all_skills[:10])}")
+        return "\n".join(lines)
+
+
+    def _clean_answer(self, answer: str) -> str:
+        """Clean and minimize answer - remove all fluff"""
+        if not answer:
+            return ""
         
-        elif strategy['focus'] == 'professional_background':
-            prompt_parts.append(f"\nCOMPANIES: {', '.join(context['companies'][:3])}")
+        # Remove common prefixes
+        answer = answer.strip()
+        answer = re.sub(r'^(answer|response|here|the answer is|my answer|a:)[\s:]*', '', answer, flags=re.IGNORECASE)
+        answer = re.sub(r'^(i would say|i think|i believe|i feel)[\s]*', '', answer, flags=re.IGNORECASE)
+        answer = re.sub(r'^(based on|according to)[\s]*', '', answer, flags=re.IGNORECASE)
         
-        elif strategy['focus'] == 'management_ability':
-            prompt_parts.append(f"\nLeadership skills inferred from: {', '.join(all_skills[:4])}")
+        # Remove trailing explanations
+        answer = re.sub(r'\.(\s+.*)?$', '', answer)  # Remove period and anything after
+        answer = re.sub(r'thank you.*?$', '', answer, flags=re.IGNORECASE)
+        answer = re.sub(r'hope this helps.*?$', '', answer, flags=re.IGNORECASE)
         
-        # Add tone instruction
-        prompt_parts.append(f"\nTONE: {strategy['tone'].capitalize()}, professional, and concise.")
+        # Remove common suffixes
+        answer = re.sub(r'(\.|!|\?|;)$', '', answer)
         
-        # Add strict formatting rules
-        prompt_parts.append("\nEXTREMELY IMPORTANT RULES:")
-        prompt_parts.append("- Keep ALL answers as minimalist and short as possible.")
-        prompt_parts.append(f"- If the question asks for years of experience (overall or in a specific skill), answer ONLY with the exact number '{MY_EXPERIENCE}'. Do not include the word 'years'.")
-        prompt_parts.append(f"- Assume the candidate has exactly {MY_EXPERIENCE} years of experience in ALL skills listed above.")
-        prompt_parts.append("- If you don't know the answer or the question asks for information not in the resume, output EXACTLY the phrase 'UNKNOWN_ANSWER'.")
+        # Clean whitespace
+        answer = ' '.join(answer.split())
         
-        # Add length instruction
-        if strategy['length'] == 'short':
-            prompt_parts.append("- Length: 1 sentence maximum.")
-        elif strategy['length'] == 'medium':
-            prompt_parts.append("- Length: 1-2 sentences maximum.")
-        else:
-            prompt_parts.append("- Length: 2 sentences maximum.")
-        
-        # Add example instruction if applicable
-        if strategy['examples']:
-            prompt_parts.append("- Include a brief relevant example if possible.")
-            
-        if hasattr(self, '_current_history') and self._current_history:
-            prompt_parts.append("\nPREVIOUSLY ANSWERED QUESTIONS IN THIS SESSION (FOR CONTEXT):")
-            prompt_parts.append(self._current_history)
-        
-        prompt_parts.append("\nProvide ONLY the exact answer to the input field - no explanations, no greetings, and no extra text.")
-        
-        return "\n".join(prompt_parts)
+        return answer.strip()
+
     
-    def _generate_answer(self, question: str, analyzer: QuestionAnalyzer, history: str = "") -> str:
-        """Generate answer using Gemini with context"""
-        self._current_history = history
+
+    def _try_decision_tree(self, question: str) -> Optional[str]:
+        """Try decision tree first (fastest, most reliable)"""
+        answer, category = self.decision_tree.find_answer(question)
+        if answer:
+            print(f"✅ Tree match [{category}]: {answer}")
+            return answer
+        return None
+
+    def _try_smart_answer(self, question: str) -> Optional[str]:
+        """Try to get answer from smart matcher first (no LLM call)"""
+        answer, source = self.smart_matcher.find_best_answer(question, use_llm_fallback=False)
+        if answer and source != 'llm_needed':
+            print(f"✅ Smart match [{source}]: {answer}")
+            return answer
+        return None
+
+    def _generate_answer_ollama(self, prompt: str) -> Optional[str]:
+        """Generate answer using Ollama"""
         try:
-            prompt = self._build_context_prompt(question, analyzer)
-            
-            print(f"🤖 Generating answer for: {question[:50]}...")
-            
+            print(f"🔌 Trying Ollama ({OLLAMA_MODEL})...")
+            data = json.dumps({"model": OLLAMA_MODEL, "prompt": prompt, "stream": False}).encode("utf-8")
+            req = urllib.request.Request(OLLAMA_URL, data=data, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=120) as response:
+                result = json.loads(response.read().decode("utf-8"))
+                answer = result.get("response", "").strip()
+                if answer:
+                    _stats['ollama_used'] += 1
+                    print(f"✅ Answer generated by Ollama: {answer[:40]}...")
+                    return answer
+        except Exception as e:
+            print(f"⚠️  Ollama failed: {e}")
+        return None
+    
+    def _generate_answer_gemini(self, prompt: str) -> Optional[str]:
+        """Generate answer using Gemini as fallback"""
+        try:
+            print(f"🔲 Trying Gemini ({MODEL})...")
             models_to_try = [MODEL, "gemini-3.5-flash", "gemini-2.5-flash"]
-            # Deduplicate while preserving order
             models_to_try = list(dict.fromkeys(models_to_try))
-            
-            last_error = None
-            answer = None
             
             for m in models_to_try:
                 try:
@@ -177,29 +209,38 @@ class GeminiAnswerEngine:
                     )
                     answer = response.text.strip()
                     if m != MODEL:
-                        print(f"⚠️ Fell back to model: {m}")
-                    break
+                        print(f"⚠️  Fell back to model: {m}")
+                    _stats['gemini_used'] += 1
+                    print(f"✅ Answer generated by Gemini: {answer[:40]}...")
+                    return answer
                 except Exception as e:
-                    last_error = e
-                    print(f"⚠️ Model {m} failed: {e}. Trying next...")
+                    print(f"⚠️  Model {m} failed: {e}")
+        except Exception as e:
+            print(f"⚠️  Gemini fallback failed: {e}")
+        return None
+    
+    def _generate_answer(self, question: str, analyzer: QuestionAnalyzer, history: str = "") -> str:
+        """Generate answer using Ollama (primary) or Gemini (fallback)"""
+        self._current_history = history
+        try:
+            prompt = self._build_context_prompt(question, analyzer)
+            print(f"🤖 Generating answer for: {question[:50]}...")
             
-            if answer is None:
-                print(f"⚠️ All Gemini models failed. Trying local Ollama ({OLLAMA_MODEL})...")
-                try:
-                    url = "http://localhost:11434/api/generate"
-                    data = json.dumps({"model": OLLAMA_MODEL, "prompt": prompt, "stream": False}).encode("utf-8")
-                    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-                    with urllib.request.urlopen(req, timeout=30) as response:
-                        result = json.loads(response.read().decode("utf-8"))
-                        answer = result.get("response", "").strip()
-                        print(f"✅ Fell back to local Ollama model: {OLLAMA_MODEL}")
-                except Exception as ollama_err:
-                    print(f"❌ Ollama fallback also failed: {ollama_err}")
-                    raise last_error
-                
-            print(f"✅ Answer generated by LLM: {answer[:30]}...")
+            answer = None
+            
+            # Try Ollama first if enabled
+            if USE_OLLAMA_FIRST:
+                answer = self._generate_answer_ollama(prompt)
+            
+            # Fallback to Gemini if Ollama failed or disabled
+            if not answer:
+                answer = self._generate_answer_gemini(prompt)
+            
+            if not answer:
+                raise Exception("All backends failed to generate answer")
+            
             # Clean up the answer
-            answer = re.sub(r'^(answer:|response:|here\'s.*?:)', '', answer, flags=re.IGNORECASE).strip()
+            answer = self._clean_answer(answer)
             
             if answer == "UNKNOWN_ANSWER":
                 raise SkipJobException("AI does not know the answer to this question.")
@@ -220,6 +261,18 @@ class GeminiAnswerEngine:
             Tuple of (answer, metadata)
         """
         _stats['calls'] += 1
+        
+        # 0. Try decision tree first (fastest, most reliable)
+        tree_answer = self._try_decision_tree(question)
+        if tree_answer:
+            _stats['cached'] += 1
+            return tree_answer, {'source': 'decision_tree', 'analyzer': None}
+        
+        # 1a. Try smart matcher (backup)
+        smart_answer = self._try_smart_answer(question)
+        if smart_answer:
+            _stats['cached'] += 1
+            return smart_answer, {'source': 'smart_matcher', 'analyzer': None}
         
         # 1. Predefined answers override
         q_lower = question.lower()
@@ -267,6 +320,8 @@ class GeminiAnswerEngine:
             'total_calls': _stats['calls'],
             'cached_answers': _stats['cached'],
             'generated_answers': _stats['generated'],
+            'ollama_used': _stats['ollama_used'],
+            'gemini_used': _stats['gemini_used'],
             'cache_hit_rate': _stats['cached'] / max(_stats['calls'], 1),
             'cache_size': len(_qa_cache),
         }
@@ -275,11 +330,11 @@ class GeminiAnswerEngine:
 # Global engine instance
 _engine = None
 
-def get_engine() -> GeminiAnswerEngine:
+def get_engine() -> AIAnswerEngine:
     """Get or create the answer engine"""
     global _engine
     if _engine is None:
-        _engine = GeminiAnswerEngine()
+        _engine = AIAnswerEngine()
     return _engine
 
 
@@ -392,8 +447,32 @@ def login(page: Page):
 # ═══════════════════════════════════════════════════════════════
 
 def is_applied(page: Page) -> bool:
-    """Check for success indicators"""
+    """Check for success indicators using XPath and text matching"""
     try:
+        # Check using XPath for applied status element
+        try:
+            # Full XPath
+            elem_full = page.locator("xpath=/html/body/div/main/div[1]/div[1]/div[1]/div[1]/div/div[2]/div[1]/div[1]")
+            if elem_full.count() > 0:
+                text = elem_full.inner_text().lower()
+                if "applied" in text or "You were redirected" in text:
+                    log("✅", "Applied detected via XPath (full)")
+                    return True
+        except:
+            pass
+        
+        try:
+            # Short XPath with root ID
+            elem_short = page.locator("xpath=//*[@id='root']/main/div[1]/div[1]/div[1]/div[1]/div/div[2]/div[1]/div[1]")
+            if elem_short.count() > 0:
+                text = elem_short.inner_text().lower()
+                if "applied" in text:
+                    log("✅", "Applied detected via XPath (short)")
+                    return True
+        except:
+            pass
+        
+        # Fallback: check page content for success phrases
         content = page.content().lower()
         success_phrases = [
             "successfully applied", 
@@ -402,19 +481,21 @@ def is_applied(page: Page) -> bool:
             "already applied"
         ]
         if any(phrase in content for phrase in success_phrases):
+            log("✅", "Applied detected via content search")
             return True
             
         # Check if the Apply button has changed to an 'Applied' state
         try:
-            # Often Naukri changes the button text exactly to "Applied"
             applied_elem = page.locator("button:text-is('Applied'), div:text-is('Applied'), span:text-is('Applied')").first
             if applied_elem.count() > 0 and applied_elem.is_visible():
+                log("✅", "Applied detected via button text")
                 return True
         except:
             pass
             
         return False
-    except:
+    except Exception as e:
+        log("⚠️", f"Error checking applied status: {e}")
         return False
 
 
@@ -675,7 +756,7 @@ def answer_turn(chatbot, q: str, history: str = "") -> Tuple[bool, str]:
 # APPLY PROCESS
 # ═══════════════════════════════════════════════════════════════
 
-def apply_job(job_page: Page) -> Tuple[bool | str, Any]:
+def apply_job(job_page: Page) -> Tuple[bool | str, any]:
     """Apply to job with question handling."""
     
     btn = find_apply_btn(job_page)
@@ -1019,8 +1100,48 @@ def main():
                         log("🚫", "Closed Job Tab")
                     wait(page, 1000)
 
+            # Print final stats
             log("\n" + "="*60, "")
             log("🏁", f"DONE - Applied: {applied} | External: {external} | Skipped: {skipped}")
+            
+            stats = get_stats()
+            print(f"\n📊 AI Backend Statistics:")
+            print(f"   Total Questions: {stats['total_calls']}")
+            print(f"   Cached Answers: {stats['cached_answers']}")
+            print(f"   Generated Answers: {stats['generated_answers']}")
+            print(f"   Ollama Used: {stats['ollama_used']}")
+            print(f"   Gemini Used: {stats['gemini_used']}")
+            print(f"   Cache Hit Rate: {stats['cache_hit_rate']:.1%}")
+            
+            # Record statistics for dashboard
+            run_data = {
+                'jobs_loaded': total_jobs,
+                'jobs_filtered': len(valid_jobs),
+                'jobs_applied': applied,
+                'jobs_skipped': skipped,
+                'questions_total': stats['total_calls'],
+                'questions_answered': stats['generated_answers'] + stats['cached_answers'],
+                'questions_unanswered': 0,
+                'questions_by_type': {},
+                'external_redirects': external,
+                'external_urls': [],
+                'llm_calls': stats['gemini_used'],
+                'decision_tree_calls': stats['cached_answers'],
+                'cache_hits': stats['cached_answers'],
+                'errors': 0,
+                'error_list': [],
+                'duration': 0,
+            }
+            
+            try:
+                bot_stats = BotStatistics()
+                bot_stats.record_run(run_data)
+                dashboard = DynamicDashboard()
+                dashboard.generate_dynamic_dashboard()
+                print(f"\n✅ Statistics recorded and dashboard updated!")
+                print(f"   View dashboard: data/dashboard.html")
+            except Exception as e:
+                print(f"⚠️  Could not update dashboard: {e}")
 
 
 if __name__ == "__main__":
