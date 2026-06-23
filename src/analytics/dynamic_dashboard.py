@@ -283,8 +283,6 @@ class DynamicDashboard:
                 <p>Real-time statistics and metrics</p>
             </div>
             <div class="refresh-indicator">
-                <span class="refresh-dot"></span>
-                <span>Live (refreshing every 5s)</span>
                 <div style="margin-top: 8px; font-size: 11px;">
                     Last Bot Execution: <span id="lastSync">{datetime.now().strftime('%Y-%m-%d %I:%M:%S %p')}</span>
                 </div>
@@ -562,7 +560,7 @@ class DynamicDashboard:
         
         <div class="footer">
             <p>🤖 Naukri Bot - Automated Job Applications Dashboard</p>
-            <p>Stats refresh every 5 seconds | Data stored in: data/bot_statistics.json</p>
+            <p>Data stored in: data/bot_statistics.json</p>
         </div>
     </div>
     
@@ -576,17 +574,6 @@ class DynamicDashboard:
             document.getElementById(tab + '-content').classList.add('active');
             event.target.classList.add('active');
         }}
-        
-        // Auto-refresh every 5 seconds
-        setInterval(function() {{
-            location.reload();
-        }}, 5000);
-        
-        // Update last sync time
-        setInterval(function() {{
-            const now = new Date();
-            document.getElementById('lastSync').textContent = now.toLocaleTimeString();
-        }}, 1000);
     </script>
 </body>
 </html>
