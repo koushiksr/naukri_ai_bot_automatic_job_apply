@@ -286,7 +286,7 @@ class DynamicDashboard:
                 <span class="refresh-dot"></span>
                 <span>Live (refreshing every 5s)</span>
                 <div style="margin-top: 8px; font-size: 11px;">
-                    Last sync: <span id="lastSync">{datetime.now().strftime('%H:%M:%S')}</span>
+                    Last Bot Execution: <span id="lastSync">{datetime.now().strftime('%Y-%m-%d %I:%M:%S %p')}</span>
                 </div>
             </div>
         </div>
@@ -318,7 +318,7 @@ class DynamicDashboard:
             <div class="stat-card">
                 <div class="stat-label">Today - Total Runs</div>
                 <div class="stat-value" id="todayRuns">{daily_stats.get('total_runs', 0)}</div>
-                <div class="stat-change">Next run in ~15 min</div>
+                <div class="stat-change">Runs every 4 hours</div>
             </div>
         </div>
         
