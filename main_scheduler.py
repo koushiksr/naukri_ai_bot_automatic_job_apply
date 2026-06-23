@@ -88,8 +88,8 @@ class NaukriBotScheduler:
             start_time = time.time()
             
             # Import and run bot
-            from src.bot import main
-            main()
+            import src.main as bot_main
+            bot_main.main()
             
             duration = time.time() - start_time
             self.stats['total_duration'] += duration

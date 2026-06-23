@@ -4,12 +4,12 @@ PASSWORD = "qohcyt-hobsEx-1xirco"
 
 # Gemini API Configuration
 API_KEY = "[REDACTED]"
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-1.5-pro"
 
 # Ollama Configuration (Primary Backend)
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "qwen3-vl:4b"
-USE_OLLAMA_FIRST = True  # Try local Ollama before Gemini
+USE_OLLAMA_FIRST = False  # Try local Ollama before Gemini
 
 # Application Settings
 MY_EXPERIENCE = 2.5  # Your years of experience
@@ -18,7 +18,10 @@ RESUME_FILE = "data/Resume.pdf"
 
 # Salary Configuration (for smart matcher)
 CURRENT_CTC_ANNUAL = 500000  # Annual salary in rupees
-EXPECTED_CTC_ANNUAL = 800000  # Expected salary in rupees
+EXPECTED_CTC_ANNUAL = 1500000  # Expected salary in rupees
+
+# Search Target Configuration
+SEARCH_URL = "https://www.naukri.com/machine-learning-jobs?k=machine%20learning&sortBy=date"
 
 # Automation Settings
 HEADLESS = False  # Set to True to run browser in headless mode
@@ -34,8 +37,8 @@ JOB_FILTERS = {
     "location": ["Bangalore", "Remote"],
     "experience": [2, 3],
     "job_type": ["Full-time", "Internship"],
-    "keywords": ["Python", "Data Science", "Machine Learning"],
-    "must_have_keywords": [],  # Leave empty to accept all
+    "keywords": ["Python", "Data Science", "Machine Learning", "AI", "ML", "Artificial Intelligence"],
+    "must_have_keywords": ["Machine Learning", "AI", "ML", "Artificial Intelligence"],  # Leave empty to accept all
     "must_not_have_keywords": [],
     "women_only": False,
     "remote_only": False,
@@ -46,11 +49,11 @@ JOB_FILTERS = {
 PREDEFINED_ANSWERS = {
     # ===== SALARY / CTC (auto-converts between formats) =====
     "current ctc": "500000",          # Will auto-convert to lakhs/monthly if asked
-    "expected ctc": "800000",         # Will auto-convert to lakhs/monthly if asked
+    "expected ctc": "1500000",         # Will auto-convert to lakhs/monthly if asked
     "current ctc lakhs": "5",
-    "expected ctc lakhs": "8",
+    "expected ctc lakhs": "15",
     "current salary": "500000",
-    "expected salary": "800000",
+    "expected salary": "1500000",
     "take home": "35000",             # Monthly
     "net salary": "35000",
     

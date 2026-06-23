@@ -5,9 +5,12 @@ Main entry point - Run this to start the bot
 """
 
 import sys
-sys.path.insert(0, './src')
+import os
 
-import bot
+# Add src to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
+
+import main as bot_main
 
 if __name__ == "__main__":
-    bot.main()
+    bot_main.main()

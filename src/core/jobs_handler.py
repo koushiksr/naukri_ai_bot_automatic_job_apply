@@ -37,29 +37,29 @@ from playwright.sync_api import Page, Locator
 # ─────────────────────────────────────────────
 class _Sel:
     # container
-    ARTICLE         = "article.jobTuple"
+    ARTICLE         = "article.jobTuple, div.srp-jobtuple-wrapper, div[class*='jobTuple']"
 
     # header
-    ROLE            = "p.title"
-    COMPANY         = "span.subTitle"
-    RATING          = "span.starRating .typ-12Bold"
+    ROLE            = "p.title, a.title"
+    COMPANY         = "span.subTitle, a.comp-name, a.subTitle"
+    RATING          = "span.starRating .typ-12Bold, span.main-2"
 
     # inline facts  (li icons differ only by class suffix)
-    EXPERIENCE      = "li.experience span"
-    SALARY          = "li.salary span"
-    LOCATION        = "li.location span"
+    EXPERIENCE      = "li.experience span, span.expwdth"
+    SALARY          = "li.salary span, span.sal"
+    LOCATION        = "li.location span, span.locWdth"
 
     # body
-    JD_TEXT         = "div.job-description span"
+    JD_TEXT         = "div.job-description span, span.job-desc"
 
     # tags
-    SKILL_TAGS      = "ul.tags li"
+    SKILL_TAGS      = "ul.tags li, ul.tags-gt li"
 
     # footer badges
-    WOMEN_ONLY_PILL = "div.pill-container.type span.label"   # "Prefers women"
-    URGENT_BADGE    = "span.urgent-hiring"                   # exists only when urgent
-    POSTED_DATE     = "div.type span.fw500"
-    HIDE_BTN        = ".naukicon-ot-hide"
+    WOMEN_ONLY_PILL = "div.pill-container.type span.label, span.prefers-women"   # "Prefers women"
+    URGENT_BADGE    = "span.urgent-hiring, span.ni-job-tuple-icon-srp-urgent"    # exists only when urgent
+    POSTED_DATE     = "div.type span.fw500, span.job-post-day"
+    HIDE_BTN        = ".naukicon-ot-hide, span.ni-job-tuple-icon-srp-hide"
 
 
 # ─────────────────────────────────────────────
